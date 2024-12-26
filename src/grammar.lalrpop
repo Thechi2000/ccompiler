@@ -35,9 +35,41 @@ pub Type: Type = {
     }
 }
 
-pub Term: i32 = {
-    <n:Num> => n,
-    "(" <t:Term> ")" => t,
+pub Expr: Expr = {
+    #[precedence(level = "0")]
+    Identifier => Expr::Identifier(<>),
+    IntLitteral => Expr::Litteral(<>),
+
+    #[precedence(level = "10")] #[assoc(side="left")]
+    <lhs: Expr> "*" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Mul },
+    <lhs: Expr> "/" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Div },
+    <lhs: Expr> "%" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Mod },
+
+    #[precedence(level = "11")] #[assoc(side="left")]
+    <lhs: Expr> "+" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Add },
+    <lhs: Expr> "-" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Sub },
+    
+    #[precedence(level = "12")] #[assoc(side="left")]
+    <lhs: Expr> "<<" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::ShiftLeft },
+    <lhs: Expr> ">>" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::ShiftRight },
+    
+    #[precedence(level = "13")] #[assoc(side="left")]
+    <lhs: Expr> "<" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LessThan },
+    <lhs: Expr> ">" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::GreaterThan },
+    <lhs: Expr> "<=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LessOrEqual },
+    <lhs: Expr> ">=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::GreaterOrEqual },
+    <lhs: Expr> "==" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Equal },
+    <lhs: Expr> "!=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Different },
+    
+    #[precedence(level = "14")] #[assoc(side="left")]
+    <lhs: Expr> "&" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::BAnd },
+    <lhs: Expr> "|" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::BOr },
+    <lhs: Expr> "^" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Xor },
+    
+    #[precedence(level = "15")] #[assoc(side="left")]
+    <lhs: Expr> "&&" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LAnd },
+    <lhs: Expr> "||" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LOr },
 };
 
-Num: i32 = <s:r"[0-9]+"> => i32::from_str(s).unwrap();
+Identifier: String = <s:r"[_a-zA-Z]\w*"> => s.to_owned();
+IntLitteral: i32 = <s:r"[0-9]+"> => i32::from_str(s).unwrap();

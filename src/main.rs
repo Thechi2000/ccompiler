@@ -17,5 +17,5 @@ enum Commands {
 }
 
 fn main() {
-    dbg!(grammar::TypeParser::new().parse("const unsigned int"));
+    dbg!(grammar::ExprParser::new().parse("a + 3 * b << 4"));
 }
