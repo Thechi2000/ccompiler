@@ -38,7 +38,7 @@ pub Type: Type = {
 pub Expr: Expr = {
     #[precedence(level = "0")]
     Identifier => Expr::Identifier(<>),
-    IntLitteral => Expr::Litteral(<>),
+    Litteral => Expr::Litteral(<>),
 
     #[precedence(level = "10")] #[assoc(side="left")]
     <lhs: Expr> "*" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Mul },
@@ -72,4 +72,10 @@ pub Expr: Expr = {
 };
 
 Identifier: String = <s:r"[_a-zA-Z]\w*"> => s.to_owned();
-IntLitteral: i32 = <s:r"[0-9]+"> => i32::from_str(s).unwrap();
+
+IntLitteral: i128 = <s:r"-?\d+"> => i128::from_str(s).unwrap();
+StringLitteral: String = <s:r#""(\"|[^"])*""#> => s.to_owned();
+pub Litteral: Litteral = {
+    IntLitteral => Litteral::Integer(<>),
+    StringLitteral => Litteral::String(<>),
+}

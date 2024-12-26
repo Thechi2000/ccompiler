@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 #[derive(Debug, Clone)]
 pub enum PrimitiveType {
     Char,
@@ -71,6 +73,12 @@ pub enum BinOp {
 }
 
 #[derive(Debug, Clone)]
+pub enum Litteral {
+    String(String),
+    Integer(i128),
+}
+
+#[derive(Debug, Clone)]
 pub enum Expr {
     BinaryOperation {
         lhs: Box<Expr>,
@@ -86,5 +94,5 @@ pub enum Expr {
         op: PostUnOp,
     },
     Identifier(String),
-    Litteral(i32),
+    Litteral(Litteral),
 }
