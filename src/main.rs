@@ -1,9 +1,8 @@
-use std::fs::File;
-
 use clap::{command, Parser, Subcommand};
-use tokeniser::{IterReader, Tokeniser};
+use lalrpop_util::lalrpop_mod;
 
-mod tokeniser;
+lalrpop_mod!(grammar);
+mod ast;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -18,13 +17,5 @@ enum Commands {
 }
 
 fn main() {
-    let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Tokenise { file } => {
-            let tok = Tokeniser::new(IterReader::new(File::open(file).unwrap()));
-
-            tok.for_each(|t| println!("{}", t));
-        }
-    }
+    dbg!(grammar::TypeParser::new().parse("const unsigned int"));
 }

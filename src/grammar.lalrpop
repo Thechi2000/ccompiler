@@ -1,0 +1,43 @@
+use std::str::FromStr;
+use crate::ast::*;
+
+grammar;
+
+pub PrimitiveType: PrimitiveType = {
+    "char" => PrimitiveType::Char,
+    "int" => PrimitiveType::Int,
+    "long" => PrimitiveType::Long,
+    "float" => PrimitiveType::Float,
+    "double" => PrimitiveType::Double,
+    "void" => PrimitiveType::Void,
+};
+
+
+pub TypeSpecifier: TypeSpecifier = {
+    "long" => TypeSpecifier::Long,
+    "short" => TypeSpecifier::Short,
+    "unsigned" => TypeSpecifier::Unsigned,
+    "signed" => TypeSpecifier::Signed,
+};
+
+
+pub TypeQualifier: TypeQualifier = {
+    "const" => TypeQualifier::Const,
+    "restrict" => TypeQualifier::Restrict,
+    "volatile" => TypeQualifier::Volatile,
+};
+
+pub Type: Type = {
+    <q: TypeQualifier*> <s: TypeSpecifier*> <t: PrimitiveType> => Type {
+        primitive: t,
+        specifiers: s,
+        qualifiers: q,
+    }
+}
+
+pub Term: i32 = {
+    <n:Num> => n,
+    "(" <t:Term> ")" => t,
+};
+
+Num: i32 = <s:r"[0-9]+"> => i32::from_str(s).unwrap();
