@@ -95,6 +95,10 @@ pub enum Expr {
     },
     Identifier(String),
     Litteral(Litteral),
+    FunctionCall {
+        name: String,
+        parameters: Vec<Expr>,
+    },
 }
 
 pub type Identifier = String;

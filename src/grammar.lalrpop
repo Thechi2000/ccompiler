@@ -162,6 +162,9 @@ pub Expr: Expr = {
     #[precedence(level = "15")] #[assoc(side="left")]
     <lhs: Expr> "&&" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LAnd },
     <lhs: Expr> "||" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LOr },
+
+    #[precedence(level = "20")]
+    <i: Identifier> "(" <p: Comma<Expr>> ")" => Expr::FunctionCall { name: i, parameters: p }
 };
 
 Identifier: String = <s:r"[_a-zA-Z]\w*"> => s.to_owned();
