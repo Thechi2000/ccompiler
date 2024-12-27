@@ -3,6 +3,99 @@ use crate::ast::*;
 
 grammar;
 
+Comma<T>: Vec<T> = { // (1)
+    <mut v:(<T> ",")*> <e:T?> => match e { // (2)
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+match {
+    "auto",
+    "break",
+    "case",
+    "char",
+    "const",
+    "continue",
+    "default",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "extern",
+    "float",
+    "for",
+    "goto",
+    "if",
+    "inline",
+    "int",
+    "long",
+    "register",
+    "restrict",
+    "return",
+    "short",
+    "signed",
+    "sizeof",
+    "static",
+    "struct",
+    "switch",
+    "typedef",
+    "union",
+    "unsigned",
+    "void",
+    "volatile",
+    "while",
+    "{",
+    "}",
+    "[",
+    "]",
+    "(",
+    ")",
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
+    "++",
+    "--",
+    "|",
+    "&",
+    "<<",
+    ">>",
+    "^",
+    "=",
+    "+=",
+    "-=",
+    "*=",
+    "/=",
+    "%=",
+    "&=",
+    "|=",
+    "^=",
+    ">>=",
+    "<<=",
+    "==",
+    "!=",
+    ">",
+    "<",
+    ">=",
+    "<=",
+    "&&",
+    "||",
+    "!",
+    "~",
+    ",",
+    ";",
+    ":",
+} else {
+    r"-?\d+",
+    r#""(\"|[^"])*""#,
+    r"[_a-zA-Z]\w*"
+}
+
 pub PrimitiveType: PrimitiveType = {
     "char" => PrimitiveType::Char,
     "int" => PrimitiveType::Int,
@@ -79,3 +172,18 @@ pub Litteral: Litteral = {
     IntLitteral => Litteral::Integer(<>),
     StringLitteral => Litteral::String(<>),
 }
+
+VariableInitializer: Expr = {
+    "=" <e: Expr> => e
+};
+VariableDeclaration: (Identifier, Option<Expr>) = {
+    <i: Identifier> <v: VariableInitializer?> => (<>)
+}
+
+pub Statement: Statement = {
+    <t: Type> <v: Comma<VariableDeclaration>> ";" => Statement::Declaration { type_: t, variables: v },
+    <e: Expr> ";" => Statement::Expression(e),
+    "if" "(" <c: Expr> ")" "{" <t: Statement*> "}" "else" "{" <f: Statement*> "}" => Statement::IfElse { condition: c, true_case: Box::new(Statement::Block(t)), false_case: Some(Box::new(Statement::Block(f))) },
+    "while" "(" <c: Expr> ")" "{" <b: Statement*> "}" => Statement::While { condition: c, body: Box::new(Statement::Block(b)) },
+    "do" "{" <b: Statement*> "}" "while" "(" <c: Expr> ")" ";" => Statement::DoWhile {condition: c, body: Box::new(Statement::Block(b)) },
+};

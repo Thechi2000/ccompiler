@@ -17,5 +17,10 @@ enum Commands {
 }
 
 fn main() {
-    dbg!(grammar::ExprParser::new().parse("a + 3 * b << 4"));
+    dbg!(grammar::StatementParser::new().parse(r#"
+    while (a < 0) {
+        int b = a + 1;
+        const char c = b;
+    }
+    "#));
 }

@@ -96,3 +96,28 @@ pub enum Expr {
     Identifier(String),
     Litteral(Litteral),
 }
+
+pub type Identifier = String;
+
+#[derive(Debug, Clone)]
+pub enum Statement {
+    Declaration {
+        type_: Type,
+        variables: Vec<(Identifier, Option<Expr>)>,
+    },
+    Expression(Expr),
+    Block(Vec<Statement>),
+    IfElse {
+        condition: Expr,
+        true_case: Box<Statement>,
+        false_case: Option<Box<Statement>>,
+    },
+    While {
+        condition: Expr,
+        body: Box<Statement>,
+    },
+    DoWhile {
+        condition: Expr,
+        body: Box<Statement>,
+    },
+}
