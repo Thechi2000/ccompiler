@@ -121,3 +121,13 @@ pub enum Statement {
         body: Box<Statement>,
     },
 }
+
+#[derive(Debug, Clone)]
+pub enum TopLevelDeclaration {
+    Function {
+        name: Identifier,
+        return_type: Type,
+        parameters: Vec<(Type, Identifier)>,
+        body: Vec<Statement>,
+    },
+}

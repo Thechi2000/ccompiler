@@ -17,10 +17,12 @@ enum Commands {
 }
 
 fn main() {
-    dbg!(grammar::StatementParser::new().parse(r#"
-    while (a < 0) {
-        int b = a + 1;
-        const char c = b;
+    dbg!(grammar::TopLevelDeclarationParser::new().parse(r#"
+    int main(const int argc) {
+        while (a < 0) {
+            int b = a + 1;
+            const char c = b;
+        }
     }
     "#));
 }

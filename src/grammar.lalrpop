@@ -187,3 +187,10 @@ pub Statement: Statement = {
     "while" "(" <c: Expr> ")" "{" <b: Statement*> "}" => Statement::While { condition: c, body: Box::new(Statement::Block(b)) },
     "do" "{" <b: Statement*> "}" "while" "(" <c: Expr> ")" ";" => Statement::DoWhile {condition: c, body: Box::new(Statement::Block(b)) },
 };
+
+FunctionParameter: (Type, Identifier) = {
+    <t: Type> <i: Identifier> => (<>)
+}
+pub TopLevelDeclaration: TopLevelDeclaration = {
+    <t: Type> <i: Identifier> "(" <p: FunctionParameter*> ")" "{" <b: Statement*> "}" => TopLevelDeclaration::Function { return_type: t, name: i, parameters: p, body: b }
+}
