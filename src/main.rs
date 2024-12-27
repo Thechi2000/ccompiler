@@ -1,3 +1,5 @@
+use std::{fs::File, io::Read};
+
 use clap::{command, Parser, Subcommand};
 use lalrpop_util::lalrpop_mod;
 
@@ -13,16 +15,24 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Tokenise { file: String },
+    Parse { file: String },
 }
 
 fn main() {
-    dbg!(grammar::TopLevelDeclarationParser::new().parse(r#"
-    int main(const int argc) {
-        while (a < 0) {
-            int b = a + 1;
-            const char c = b;
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::Parse { file } => {
+            let mut str = String::new();
+            File::open(file)
+                .expect("Unable to open source file")
+                .read_to_string(&mut str)
+                .expect("Unable to read from source file");
+
+            eprintln!(
+                "{:#?}",
+                grammar::TopLevelDeclarationParser::new().parse(&str)
+            )
         }
     }
-    "#));
 }
