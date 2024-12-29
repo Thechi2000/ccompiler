@@ -32,6 +32,10 @@ pub mod asm {
         R13,
         R14,
         R15,
+        Al,
+        Bl,
+        Cl,
+        Dl,
     }
 
     impl Display for Register {
@@ -53,6 +57,10 @@ pub mod asm {
                 Register::R13 => "r13",
                 Register::R14 => "r14",
                 Register::R15 => "r15",
+                Register::Al => "al",
+                Register::Bl => "bl",
+                Register::Cl => "cl",
+                Register::Dl => "dl",
             })
         }
     }
@@ -144,7 +152,7 @@ pub fn compile_expr(expr: Expr, variables: &VariableMap) -> AssemblyOutput {
                 inner(&rhs, variables, out);
 
                 match op {
-                    BinOp::Div => {
+                    BinOp::Div | BinOp::Mod => {
                         out.add1("pop", Reg(R9));
                         out.add1("pop", Reg(Rax));
 
@@ -154,19 +162,7 @@ pub fn compile_expr(expr: Expr, variables: &VariableMap) -> AssemblyOutput {
 
                         out.add1("idivq", Reg(R9));
 
-                        out.add1("push", Reg(Rax));
-                    }
-                    BinOp::Mod => {
-                        out.add1("pop", Reg(R9));
-                        out.add1("pop", Reg(Rax));
-
-                        out.add2("xor", Reg(Rbx), Reg(Rbx));
-                        out.add2("xor", Reg(Rcx), Reg(Rcx));
-                        out.add2("xor", Reg(Rdx), Reg(Rdx));
-
-                        out.add1("idivq", Reg(R9));
-
-                        out.add1("push", Reg(Rdx));
+                        out.add1("push", Reg(if let BinOp::Div = op { Rax } else { Rdx }));
                     }
                     _ => {
                         out.add1("pop", Reg(Rbx));
@@ -178,12 +174,29 @@ pub fn compile_expr(expr: Expr, variables: &VariableMap) -> AssemblyOutput {
                             BinOp::Mul => out.add2("imul", Reg(Rbx), Reg(Rax)),
                             BinOp::ShiftLeft => out.add2("sal", Reg(Rax), Reg(Rbx)),
                             BinOp::ShiftRight => out.add2("shr", Reg(Rax), Reg(Rbx)),
-                            BinOp::LessThan => todo!(),
-                            BinOp::LessOrEqual => todo!(),
-                            BinOp::GreaterThan => todo!(),
-                            BinOp::GreaterOrEqual => todo!(),
-                            BinOp::Equal => todo!(),
-                            BinOp::Different => todo!(),
+
+                            BinOp::LessThan
+                            | BinOp::LessOrEqual
+                            | BinOp::GreaterThan
+                            | BinOp::GreaterOrEqual
+                            | BinOp::Equal
+                            | BinOp::Different => {
+                                out.add2("cmp", Reg(Rbx), Reg(Rax));
+                                out.add1(
+                                    match op {
+                                        BinOp::LessThan => "setl",
+                                        BinOp::LessOrEqual => "setle",
+                                        BinOp::GreaterThan => "setg",
+                                        BinOp::GreaterOrEqual => "setge",
+                                        BinOp::Equal => "sete",
+                                        BinOp::Different => "setne",
+                                        _ => panic!(),
+                                    },
+                                    Reg(Al),
+                                );
+                                out.add2("movzx", Reg(Al), Reg(Rax));
+                            }
+
                             BinOp::BAnd => out.add2("and", Reg(Rbx), Reg(Rax)),
                             BinOp::BOr => out.add2("or", Reg(Rbx), Reg(Rax)),
                             BinOp::Xor => out.add2("xor", Reg(Rbx), Reg(Rax)),
@@ -191,7 +204,7 @@ pub fn compile_expr(expr: Expr, variables: &VariableMap) -> AssemblyOutput {
                             BinOp::LOr => todo!(),
                             BinOp::Access => todo!(),
                             BinOp::DerefAccess => todo!(),
-                            BinOp::Div | BinOp::Mod => panic!(),
+                            _ => panic!(),
                         };
 
                         out.add1("push", Reg(Rax));
