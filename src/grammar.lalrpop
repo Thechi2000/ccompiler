@@ -128,10 +128,12 @@ pub Type: Type = {
     }
 }
 
+ExprReset: Expr = Expr;
 pub Expr: Expr = {
     #[precedence(level = "0")]
     Identifier => Expr::Identifier(<>),
     Litteral => Expr::Litteral(<>),
+    "(" <e: ExprReset> ")" => e,
 
     #[precedence(level = "10")] #[assoc(side="left")]
     <lhs: Expr> "*" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Mul },
