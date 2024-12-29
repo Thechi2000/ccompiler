@@ -40,7 +40,7 @@ fn main() {
             let expr = grammar::ExprParser::new().parse(&expr).unwrap();
             let instructions = compiler::compile_expr(expr, &BTreeMap::new());
 
-            instructions.iter().for_each(|i| println!("{i}"));
+            println!("{}", instructions);
         }
     }
 }
