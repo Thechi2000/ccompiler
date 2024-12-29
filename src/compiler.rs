@@ -66,34 +66,22 @@ pub mod asm {
         }
     }
 
-    pub enum Instruction {
-        Mov(Operand, Operand),
-        Add(Operand, Operand),
-        Sub(Operand, Operand),
-        Mul(Operand, Operand),
-        Xor(Operand, Operand),
-        Div(Operand),
-        Push(Operand),
-        Pop(Operand),
+    pub struct Inst {
+        name: &'static str,
+        operands: Vec<Operand>,
     }
 
-    impl Display for Instruction {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let (name, operands) = match self {
-                Instruction::Mov(lhs, rhs) => ("mov", vec![lhs, rhs]),
-                Instruction::Add(lhs, rhs) => ("add", vec![lhs, rhs]),
-                Instruction::Sub(lhs, rhs) => ("sub", vec![lhs, rhs]),
-                Instruction::Mul(lhs, rhs) => ("imul", vec![lhs, rhs]),
-                Instruction::Xor(lhs, rhs) => ("xor", vec![lhs, rhs]),
-                Instruction::Div(op) => ("idivq", vec![op]),
-                Instruction::Push(operand) => ("push", vec![operand]),
-                Instruction::Pop(operand) => ("pop", vec![operand]),
-            };
+    pub fn inst(name: &'static str, operands: Vec<Operand>) -> Inst {
+        return Inst { name, operands };
+    }
 
-            f.write_str(name)?;
+    impl Display for Inst {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.name)?;
             f.write_char(' ')?;
             f.write_str(
-                &operands
+                &self
+                    .operands
                     .iter()
                     .map(|o| o.to_string())
                     .collect::<Vec<_>>()
@@ -105,14 +93,14 @@ pub mod asm {
 
 pub type VariableMap = BTreeMap<String, asm::Register>;
 
-pub fn compile_expr(expr: Expr, variables: &VariableMap) -> Vec<asm::Instruction> {
-    use asm::Instruction::*;
+pub fn compile_expr(expr: Expr, variables: &VariableMap) -> Vec<asm::Inst> {
+    use asm::inst;
     use asm::Operand::*;
     use asm::Register::*;
 
     let mut instructions = vec![];
 
-    fn inner(expr: &Expr, variables: &VariableMap, instructions: &mut Vec<asm::Instruction>) {
+    fn inner(expr: &Expr, variables: &VariableMap, instructions: &mut Vec<asm::Inst>) {
         match expr {
             Expr::BinaryOperation { lhs, rhs, op } => {
                 inner(&lhs, variables, instructions);
@@ -120,48 +108,48 @@ pub fn compile_expr(expr: Expr, variables: &VariableMap) -> Vec<asm::Instruction
 
                 match op {
                     BinOp::Div => {
-                        instructions.push(Pop(Reg(R9)));
-                        instructions.push(Pop(Reg(Rax)));
+                        instructions.push(inst("pop", vec![Reg(R9)]));
+                        instructions.push(inst("pop", vec![Reg(Rax)]));
 
-                        instructions.push(Xor(Reg(Rbx), Reg(Rbx)));
-                        instructions.push(Xor(Reg(Rcx), Reg(Rcx)));
-                        instructions.push(Xor(Reg(Rdx), Reg(Rdx)));
+                        instructions.push(inst("xor", vec![Reg(Rbx), Reg(Rbx)]));
+                        instructions.push(inst("xor", vec![Reg(Rcx), Reg(Rcx)]));
+                        instructions.push(inst("xor", vec![Reg(Rdx), Reg(Rdx)]));
 
-                        instructions.push(Div(Reg(R9)));
+                        instructions.push(inst("idivq", vec![Reg(R9)]));
 
-                        instructions.push(Push(Reg(Rax)));
+                        instructions.push(inst("push", vec![Reg(Rax)]));
                     }
                     BinOp::Mod => {
-                        instructions.push(Pop(Reg(R9)));
-                        instructions.push(Pop(Reg(Rax)));
+                        instructions.push(inst("pop", vec![Reg(R9)]));
+                        instructions.push(inst("pop", vec![Reg(Rax)]));
 
-                        instructions.push(Xor(Reg(Rbx), Reg(Rbx)));
-                        instructions.push(Xor(Reg(Rcx), Reg(Rcx)));
-                        instructions.push(Xor(Reg(Rdx), Reg(Rdx)));
+                        instructions.push(inst("xor", vec![Reg(Rbx), Reg(Rbx)]));
+                        instructions.push(inst("xor", vec![Reg(Rcx), Reg(Rcx)]));
+                        instructions.push(inst("xor", vec![Reg(Rdx), Reg(Rdx)]));
 
-                        instructions.push(Div(Reg(R9)));
+                        instructions.push(inst("idivq", vec![Reg(R9)]));
 
-                        instructions.push(Push(Reg(Rdx)));
+                        instructions.push(inst("push", vec![Reg(Rdx)]));
                     }
                     _ => {
-                        instructions.push(Pop(Reg(Rbx)));
-                        instructions.push(Pop(Reg(Rax)));
+                        instructions.push(inst("pop", vec![Reg(Rbx)]));
+                        instructions.push(inst("pop", vec![Reg(Rax)]));
 
                         instructions.push(match op {
-                            BinOp::Add => Add(Reg(Rbx), Reg(Rax)),
-                            BinOp::Sub => Sub(Reg(Rbx), Reg(Rax)),
-                            BinOp::Mul => Mul(Reg(Rbx), Reg(Rax)),
-                            BinOp::ShiftLeft => todo!(),
-                            BinOp::ShiftRight => todo!(),
+                            BinOp::Add => inst("add", vec![Reg(Rbx), Reg(Rax)]),
+                            BinOp::Sub => inst("sub", vec![Reg(Rbx), Reg(Rax)]),
+                            BinOp::Mul => inst("imul", vec![Reg(Rbx), Reg(Rax)]),
+                            BinOp::ShiftLeft => inst("sal", vec![Reg(Rax), Reg(Rbx)]),
+                            BinOp::ShiftRight => inst("shr", vec![Reg(Rax), Reg(Rbx) ]),
                             BinOp::LessThan => todo!(),
                             BinOp::LessOrEqual => todo!(),
                             BinOp::GreaterThan => todo!(),
                             BinOp::GreaterOrEqual => todo!(),
                             BinOp::Equal => todo!(),
                             BinOp::Different => todo!(),
-                            BinOp::BAnd => todo!(),
-                            BinOp::BOr => todo!(),
-                            BinOp::Xor => todo!(),
+                            BinOp::BAnd => inst("and", vec![Reg(Rbx), Reg(Rax)]),
+                            BinOp::BOr => inst("or", vec![Reg(Rbx), Reg(Rax)]),
+                            BinOp::Xor => inst("xor", vec![Reg(Rbx), Reg(Rax)]),
                             BinOp::LAnd => todo!(),
                             BinOp::LOr => todo!(),
                             BinOp::Access => todo!(),
@@ -169,14 +157,14 @@ pub fn compile_expr(expr: Expr, variables: &VariableMap) -> Vec<asm::Instruction
                             BinOp::Div | BinOp::Mod => panic!(),
                         });
 
-                        instructions.push(Push(Reg(Rax)));
+                        instructions.push(inst("push", vec![Reg(Rax)]));
                     }
                 }
             }
             Expr::PreUnaryOperation { hs, op } => todo!(),
             Expr::PostUnaryOperation { hs, op } => todo!(),
             Expr::Identifier(_) => todo!(),
-            Expr::Litteral(Litteral::Integer(i)) => instructions.push(Push(Imm(*i as i32))),
+            Expr::Litteral(Litteral::Integer(i)) => instructions.push(inst("push", vec![Imm(*i as i32)])),
             Expr::Litteral(Litteral::String(_)) => todo!(),
             Expr::FunctionCall { name, parameters } => todo!(),
         }
