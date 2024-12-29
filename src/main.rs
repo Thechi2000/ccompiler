@@ -1,10 +1,11 @@
-use std::{fs::File, io::Read};
+use std::{collections::BTreeMap, fs::File, io::Read};
 
 use clap::{command, Parser, Subcommand};
 use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(grammar);
 mod ast;
+mod compiler;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -16,6 +17,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Parse { file: String },
+    CompileExpr { expr: String },
 }
 
 fn main() {
@@ -33,6 +35,12 @@ fn main() {
                 "{:#?}",
                 grammar::TopLevelDeclarationParser::new().parse(&str)
             )
+        }
+        Commands::CompileExpr { expr } => {
+            let expr = grammar::ExprParser::new().parse(&expr).unwrap();
+            let instructions = compiler::compile_expr(expr, &BTreeMap::new());
+
+            instructions.iter().for_each(|i| println!("{i}"));
         }
     }
 }
