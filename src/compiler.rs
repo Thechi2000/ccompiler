@@ -1,10 +1,10 @@
 #![allow(unused)]
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, rc::Weak};
 
 use asm::AssemblyOutput;
 
-use crate::ast::{BinOp, Expr, Litteral};
+use crate::ast::{BinOp, Expr, Identifier, Litteral};
 
 // Let's define: R*x for temporary storage, R\d+ for variables. Other are reserved for other uses (stack-pointer, etc.).
 
@@ -69,6 +69,7 @@ pub mod asm {
     pub enum Operand {
         Reg(Register),
         Imm(i32),
+        Mem(Register, i32),
     }
 
     impl Display for Operand {
@@ -76,6 +77,8 @@ pub mod asm {
             match self {
                 Operand::Reg(register) => f.write_fmt(format_args!("%{}", register)),
                 Operand::Imm(i) => f.write_fmt(format_args!("$0x{:x}", i)),
+                Operand::Mem(register, 0) => f.write_fmt(format_args!("(%{})", register)),
+                Operand::Mem(register, i) => f.write_fmt(format_args!("{}(%{})", i, register)),
             }
         }
     }
@@ -136,20 +139,51 @@ pub mod asm {
     }
 }
 
+pub struct Context {
+    parent: Option<Weak<Context>>,
+    /// Offset relative to function rbp
+    variables: BTreeMap<Identifier, usize>,
+    /// Offset relative to function rbp. Used to correctly initialize variable local to this context.
+    scope_rbp: usize,
+}
+
+impl Context {
+    pub fn dummy() -> Self {
+        let mut map = BTreeMap::<Identifier, usize>::default();
+        map.insert("a".to_owned(), 0);
+        map.insert("b".to_owned(), 4);
+
+        Self {
+            parent: None,
+            variables: map,
+            scope_rbp: 0,
+        }
+    }
+
+    fn get_var(&self, name: &Identifier) -> Option<usize> {
+        self.variables.get(name).copied().or_else(|| {
+            self.parent
+                .as_ref()
+                .and_then(|w| w.upgrade())
+                .and_then(|c| c.get_var(name))
+        })
+    }
+}
+
 pub type VariableMap = BTreeMap<String, asm::Register>;
 
-pub fn compile_expr(expr: Expr, variables: &VariableMap) -> AssemblyOutput {
+pub fn compile_expr(expr: Expr, context: &Context) -> AssemblyOutput {
     use asm::inst;
     use asm::Operand::*;
     use asm::Register::*;
 
     let mut out = Default::default();
 
-    fn inner(expr: &Expr, variables: &VariableMap, out: &mut AssemblyOutput) {
+    fn inner(expr: &Expr, out: &mut AssemblyOutput, context: &Context) {
         match expr {
             Expr::BinaryOperation { lhs, rhs, op } => {
-                inner(&lhs, variables, out);
-                inner(&rhs, variables, out);
+                inner(&lhs, out, context);
+                inner(&rhs, out, context);
 
                 match op {
                     BinOp::Div | BinOp::Mod => {
@@ -213,14 +247,17 @@ pub fn compile_expr(expr: Expr, variables: &VariableMap) -> AssemblyOutput {
             }
             Expr::PreUnaryOperation { hs, op } => todo!(),
             Expr::PostUnaryOperation { hs, op } => todo!(),
-            Expr::Identifier(_) => todo!(),
+            Expr::Identifier(i) => {
+                let offset = context.get_var(i).expect("Unknown variable name");
+                out.add1("push", Mem(Rbp, offset as i32));
+            },
             Expr::Litteral(Litteral::Integer(i)) => out.add1("push", Imm(*i as i32)),
-            Expr::Litteral(Litteral::String(_)) => todo!(),
+            Expr::Litteral(Litteral::String(s)) => todo!(),
             Expr::FunctionCall { name, parameters } => todo!(),
         }
     }
 
-    inner(&expr, variables, &mut out);
+    inner(&expr, &mut out, context);
 
     out
 }

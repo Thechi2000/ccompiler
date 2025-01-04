@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fs::File, io::Read};
 
 use clap::{command, Parser, Subcommand};
+use compiler::Context;
 use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(grammar);
@@ -38,7 +39,7 @@ fn main() {
         }
         Commands::CompileExpr { expr } => {
             let expr = grammar::ExprParser::new().parse(&expr).unwrap();
-            let instructions = compiler::compile_expr(expr, &BTreeMap::new());
+            let instructions = compiler::compile_expr(expr, &Context::dummy());
 
             println!("{}", instructions);
         }
