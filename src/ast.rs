@@ -124,6 +124,9 @@ pub enum Statement {
         condition: Expr,
         body: Box<Statement>,
     },
+    Return {
+        value: Option<Expr>,
+    },
 }
 
 #[derive(Debug, Clone)]
