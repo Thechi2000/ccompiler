@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, fs::File, io::Read};
+use std::{
+    fs::{self, File},
+    io::Read,
+    path::PathBuf,
+};
 
 use clap::{command, Parser, Subcommand};
 use compiler::Context;
@@ -19,6 +23,7 @@ struct Cli {
 enum Commands {
     Parse { file: String },
     CompileExpr { expr: String },
+    CompileFile { path: PathBuf },
 }
 
 fn main() {
@@ -42,6 +47,14 @@ fn main() {
             let instructions = compiler::compile_expr(expr, &Context::dummy());
 
             println!("{}", instructions);
+        }
+        Commands::CompileFile { path } => {
+            let content = fs::read_to_string(path).unwrap();
+            let func = grammar::TopLevelDeclarationParser::new()
+                .parse(&content)
+                .unwrap();
+
+            dbg!(func);
         }
     }
 }
