@@ -1,8 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    ops::{Index, IndexMut},
-    vec,
-};
+use std::{collections::BTreeMap, vec};
 
 use crate::ast;
 
@@ -50,7 +46,9 @@ enum RegLit {
 
 #[derive(Debug)]
 enum Node {
-    Start,
+    Start {
+        next: NodeHandle,
+    },
     UnOp {
         prev: NodeHandle,
         next: NodeHandle,
@@ -69,6 +67,7 @@ enum Node {
     Fork {
         prev: NodeHandle,
         location: NodeHandle,
+        next: NodeHandle,
         cond: Register,
     },
     Join {
@@ -79,6 +78,39 @@ enum Node {
         prev: NodeHandle,
         value: Option<RegLit>,
     },
+}
+
+impl Node {
+    fn prev(&self) -> Vec<NodeHandle> {
+        match self {
+            Node::Start { .. } => vec![],
+            Node::UnOp { prev, .. }
+            | Node::BinOp { prev, .. }
+            | Node::Fork { prev, .. }
+            | Node::Ret { prev, .. } => vec![*prev],
+            Node::Join { prev, .. } => prev.clone(),
+        }
+    }
+    fn next(&self) -> Option<NodeHandle> {
+        match self {
+            Node::Ret { .. } => None,
+            Node::Start { next, .. }
+            | Node::UnOp { next, .. }
+            | Node::BinOp { next, .. }
+            | Node::Fork { next, .. }
+            | Node::Join { next, .. } => Some(*next),
+        }
+    }
+    fn next_mut(&mut self) -> Option<&mut NodeHandle> {
+        match self {
+            Node::Ret { .. } => None,
+            Node::Start { next, .. }
+            | Node::UnOp { next, .. }
+            | Node::BinOp { next, .. }
+            | Node::Fork { next, .. }
+            | Node::Join { next, .. } => Some(next),
+        }
+    }
 }
 
 pub struct Graph {
@@ -126,7 +158,7 @@ impl Graph {
                 })
             }
             ast::Statement::Expression(expr) => self.add_expr(prev, expr),
-            ast::Statement::Block(statements) => self.add_block(prev, &statements),
+            ast::Statement::Block(statements) => self.add_block(prev, statements),
             ast::Statement::IfElse(if_else_struct) => self.add_if(prev, if_else_struct),
             ast::Statement::While(while_struct) => self.add_while(prev, while_struct),
             ast::Statement::DoWhile(do_while_struct) => self.add_dowhile(prev, do_while_struct),
@@ -146,7 +178,7 @@ impl Graph {
                     (i.clone(), prev)
                 } else {
                     let reg = self.alloc_reg();
-                    let hdx = self.add_declaration(prev, &reg, &lhs);
+                    let hdx = self.add_declaration(prev, &reg, lhs);
                     (reg, hdx)
                 };
 
@@ -154,7 +186,7 @@ impl Graph {
                     (i.clone(), hdx)
                 } else {
                     let reg = self.alloc_reg();
-                    let hdx = self.add_declaration(hdx, &reg, &rhs);
+                    let hdx = self.add_declaration(hdx, &reg, rhs);
                     (reg, hdx)
                 };
 
@@ -241,7 +273,7 @@ impl Graph {
                     ast::PreUnOp::Incr | ast::PreUnOp::Decr => todo!(),
                 })
             }
-            ast::Expr::PostUnaryOperation { hs, op } => todo!(),
+            ast::Expr::PostUnaryOperation { .. } => todo!(),
             ast::Expr::Identifier(id) => self.add(Node::UnOp {
                 prev,
                 next: 0,
@@ -257,7 +289,7 @@ impl Graph {
                 hs: RegLit::Lit(*i as i32),
                 dst: r.clone(),
             }),
-            ast::Expr::FunctionCall { name, parameters } => todo!(),
+            ast::Expr::FunctionCall { .. } => todo!(),
         }
     }
     fn add_expr(&mut self, prev: NodeHandle, expr: &ast::Expr) -> NodeHandle {
@@ -283,6 +315,7 @@ impl Graph {
             prev: inv_cond_hdx,
             location: 0,
             cond: inv_cond,
+            next: 0,
         });
 
         let then_hdx = self.add_statement(branch_hdx, &i.true_case);
@@ -292,7 +325,7 @@ impl Graph {
                 prev: vec![branch_hdx],
                 next: 0,
             });
-            let else_hdx = self.add_statement(else_start_hdx, &fc);
+            let else_hdx = self.add_statement(else_start_hdx, fc);
 
             let Node::Fork { location, .. } = &mut self.nodes[branch_hdx] else {
                 panic!()
@@ -343,6 +376,7 @@ impl Graph {
             prev: inv_cond_hdx,
             location: 0,
             cond: inv_cond,
+            next: 0,
         });
 
         let body_hdx = self.add_statement(branch_hdx, &w.body);
@@ -380,6 +414,7 @@ impl Graph {
             prev: post_cond,
             location: join_hdx,
             cond,
+            next: 0,
         });
 
         let Node::Join { prev, .. } = &mut self.nodes[join_hdx] else {
@@ -396,14 +431,14 @@ impl Graph {
             .as_ref()
             .map(|expr| {
                 let val = self.alloc_reg();
-                let nh = self.add_declaration(prev, &val, &expr);
+                let nh = self.add_declaration(prev, &val, expr);
                 (val, nh)
             })
             .unzip();
 
         self.add(Node::Ret {
             prev: new_prev.unwrap_or(prev),
-            value: ret_value.map(|r| RegLit::Reg(r)),
+            value: ret_value.map(RegLit::Reg),
         })
     }
 
@@ -412,7 +447,19 @@ impl Graph {
     }
 
     fn populate_forward_edge(&mut self) {
-        // todo!()
+        for hdx in 0..self.nodes.len() {
+            for prev in self.nodes[hdx].prev() {
+                if let Node::Fork { location, .. } = &self.nodes[hdx]
+                    && *location == prev
+                {
+                    continue;
+                }
+
+                if let Some(next) = self.nodes[prev].next_mut() {
+                    *next = hdx
+                }
+            }
+        }
     }
 }
 
@@ -423,9 +470,17 @@ pub fn compile(tld: ast::TopLevelDeclaration) -> Graph {
 
     let mut graph = Graph::new();
 
-    let start = graph.add(Node::Start);
+    let start = graph.add(Node::Start { next: 0 });
     graph.add_block(start, &statements);
     graph.populate_forward_edge();
 
     graph
+}
+
+pub mod visualisation {
+    struct Node {
+        id: String,
+        children: Vec<Node>,
+        backward_edges: Vec<String>,
+    }
 }
