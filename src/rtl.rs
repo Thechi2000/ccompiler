@@ -434,8 +434,8 @@ impl Graph {
     fn populate_forward_edge(&mut self) {
         for hdx in 0..self.nodes.len() {
             for prev in self.nodes[hdx].prev() {
-                if let Node::Fork { location, .. } = &self.nodes[hdx]
-                    && *location == prev
+                if let Node::Fork { location, .. } = &self.nodes[prev]
+                    && dbg!(*location) == dbg!(hdx)
                 {
                     continue;
                 }

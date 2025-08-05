@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use clap::{command, Parser, Subcommand};
+use clap::{Parser, Subcommand, command};
 use compiler::Context;
 use lalrpop_util::lalrpop_mod;
 
@@ -47,7 +47,7 @@ fn main() {
             let expr = grammar::ExprParser::new().parse(&expr).unwrap();
             let instructions = compiler::compile_expr(expr, &Context::dummy());
 
-            println!("{}", instructions);
+            println!("{instructions}");
         }
         Commands::CompileFile { path } => {
             let content = fs::read_to_string(path).unwrap();
