@@ -157,12 +157,22 @@ impl Graph {
                     }
                 })
             }
-            ast::Statement::Expression(expr) => self.add_expr(prev, expr),
+            ast::Statement::Expression(expr) => self.add_expr(prev, expr).1,
             ast::Statement::Block(statements) => self.add_block(prev, statements),
             ast::Statement::IfElse(if_else_struct) => self.add_if(prev, if_else_struct),
             ast::Statement::While(while_struct) => self.add_while(prev, while_struct),
             ast::Statement::DoWhile(do_while_struct) => self.add_dowhile(prev, do_while_struct),
             ast::Statement::Return(return_struct) => self.add_return(prev, return_struct),
+        }
+    }
+
+    fn add_expr(&mut self, prev: NodeHandle, expr: &ast::Expr) -> (Register, NodeHandle) {
+        if let ast::Expr::Identifier(reg) = expr {
+            (reg.clone(), prev)
+        } else {
+            let reg = self.alloc_reg();
+            let hdx = self.add_declaration(prev, &reg, expr);
+            (reg, hdx)
         }
     }
 
@@ -174,21 +184,8 @@ impl Graph {
     ) -> NodeHandle {
         match v {
             ast::Expr::BinaryOperation { lhs, rhs, op } => {
-                let (lhs_reg, hdx) = if let ast::Expr::Identifier(i) = lhs.as_ref() {
-                    (i.clone(), prev)
-                } else {
-                    let reg = self.alloc_reg();
-                    let hdx = self.add_declaration(prev, &reg, lhs);
-                    (reg, hdx)
-                };
-
-                let (rhs_reg, hdx) = if let ast::Expr::Identifier(i) = rhs.as_ref() {
-                    (i.clone(), hdx)
-                } else {
-                    let reg = self.alloc_reg();
-                    let hdx = self.add_declaration(hdx, &reg, rhs);
-                    (reg, hdx)
-                };
+                let (lhs_reg, hdx) = self.add_expr(prev, &lhs);
+                let (rhs_reg, hdx) = self.add_expr(hdx, &rhs);
 
                 let op = match op {
                     ast::BinOp::Mul => BinaryOperator::Mul,
@@ -222,8 +219,7 @@ impl Graph {
                 })
             }
             ast::Expr::PreUnaryOperation { hs, op } => {
-                let reg = self.alloc_reg();
-                let expr_hdx = self.add_declaration(prev, &reg, hs);
+                let (reg, expr_hdx) = self.add_expr(prev, &hs);
 
                 self.add(match op {
                     ast::PreUnOp::Minus => Node::BinOp {
@@ -292,14 +288,9 @@ impl Graph {
             ast::Expr::FunctionCall { .. } => todo!(),
         }
     }
-    fn add_expr(&mut self, prev: NodeHandle, expr: &ast::Expr) -> NodeHandle {
-        let reg = self.alloc_reg();
-        self.add_declaration(prev, &reg, expr)
-    }
 
     fn add_if(&mut self, prev: NodeHandle, i: &ast::IfElseStruct) -> NodeHandle {
-        let cond = self.alloc_reg();
-        let cond_hdx = self.add_declaration(prev, &cond, &i.condition);
+        let (cond, cond_hdx) = self.add_expr(prev, &i.condition);
 
         let inv_cond = self.alloc_reg();
         let inv_cond_hdx = self.add(Node::BinOp {
@@ -354,8 +345,7 @@ impl Graph {
     }
 
     fn add_while(&mut self, prev: NodeHandle, w: &ast::WhileStruct) -> NodeHandle {
-        let cond = self.alloc_reg();
-        let cond_hdx = self.add_declaration(prev, &cond, &w.condition);
+        let (cond, cond_hdx) = self.add_expr(prev, &w.condition);
 
         let inv_cond = self.alloc_reg();
         let inv_cond_hdx = self.add(Node::BinOp {
@@ -407,11 +397,10 @@ impl Graph {
 
         let post_body = self.add_statement(join_hdx, &dw.body);
 
-        let cond = self.alloc_reg();
-        let post_cond = self.add_declaration(post_body, &cond, &dw.condition);
+        let (cond, cond_hdx) = self.add_expr(prev, &dw.condition);
 
         let end_hdx = self.add(Node::Fork {
-            prev: post_cond,
+            prev: cond_hdx,
             location: join_hdx,
             cond,
             next: 0,
@@ -429,11 +418,7 @@ impl Graph {
         let (ret_value, new_prev) = ret
             .value
             .as_ref()
-            .map(|expr| {
-                let val = self.alloc_reg();
-                let nh = self.add_declaration(prev, &val, expr);
-                (val, nh)
-            })
+            .map(|expr| self.add_expr(prev, expr))
             .unzip();
 
         self.add(Node::Ret {
