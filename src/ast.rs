@@ -104,6 +104,27 @@ pub enum Expr {
 pub type Identifier = String;
 
 #[derive(Debug, Clone)]
+pub struct IfElseStruct {
+    pub condition: Expr,
+    pub true_case: Box<Statement>,
+    pub false_case: Option<Box<Statement>>,
+}
+#[derive(Debug, Clone)]
+pub struct WhileStruct {
+    pub condition: Expr,
+    pub body: Box<Statement>,
+}
+#[derive(Debug, Clone)]
+pub struct DoWhileStruct {
+    pub condition: Expr,
+    pub body: Box<Statement>,
+}
+#[derive(Debug, Clone)]
+pub struct ReturnStruct {
+    pub value: Option<Expr>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Statement {
     Declaration {
         type_: Type,
@@ -111,22 +132,10 @@ pub enum Statement {
     },
     Expression(Expr),
     Block(Vec<Statement>),
-    IfElse {
-        condition: Expr,
-        true_case: Box<Statement>,
-        false_case: Option<Box<Statement>>,
-    },
-    While {
-        condition: Expr,
-        body: Box<Statement>,
-    },
-    DoWhile {
-        condition: Expr,
-        body: Box<Statement>,
-    },
-    Return {
-        value: Option<Expr>,
-    },
+    IfElse(IfElseStruct),
+    While(WhileStruct),
+    DoWhile(DoWhileStruct),
+    Return(ReturnStruct),
 }
 
 #[derive(Debug, Clone)]

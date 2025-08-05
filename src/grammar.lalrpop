@@ -188,10 +188,10 @@ VariableDeclaration: (Identifier, Option<Expr>) = {
 pub Statement: Statement = {
     <t: Type> <v: Comma<VariableDeclaration>> ";" => Statement::Declaration { type_: t, variables: v },
     <e: Expr> ";" => Statement::Expression(e),
-    "if" "(" <c: Expr> ")" "{" <t: Statement*> "}" "else" "{" <f: Statement*> "}" => Statement::IfElse { condition: c, true_case: Box::new(Statement::Block(t)), false_case: Some(Box::new(Statement::Block(f))) },
-    "while" "(" <c: Expr> ")" "{" <b: Statement*> "}" => Statement::While { condition: c, body: Box::new(Statement::Block(b)) },
-    "do" "{" <b: Statement*> "}" "while" "(" <c: Expr> ")" ";" => Statement::DoWhile { condition: c, body: Box::new(Statement::Block(b)) },
-    "return" <v: Expr?> ";" => Statement::Return { value: v},
+    "if" "(" <c: Expr> ")" "{" <t: Statement*> "}" "else" "{" <f: Statement*> "}" => Statement::IfElse(IfElseStruct { condition: c, true_case: Box::new(Statement::Block(t)), false_case: Some(Box::new(Statement::Block(f))) }),
+    "while" "(" <c: Expr> ")" "{" <b: Statement*> "}" => Statement::While(WhileStruct { condition: c, body: Box::new(Statement::Block(b)) }),
+    "do" "{" <b: Statement*> "}" "while" "(" <c: Expr> ")" ";" => Statement::DoWhile(DoWhileStruct { condition: c, body: Box::new(Statement::Block(b)) }),
+    "return" <v: Expr?> ";" => Statement::Return(ReturnStruct { value: v}),
 };
 
 FunctionParameter: (Type, Identifier) = {

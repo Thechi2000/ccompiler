@@ -11,6 +11,7 @@ use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(grammar);
 mod ast;
 mod compiler;
+mod rtl;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -54,7 +55,9 @@ fn main() {
                 .parse(&content)
                 .unwrap();
 
-            dbg!(func);
+            let graph = rtl::compile(func);
+
+            dbg!(graph);
         }
     }
 }
