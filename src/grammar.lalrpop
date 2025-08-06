@@ -129,44 +129,67 @@ pub Type: Type = {
 }
 
 ExprReset: Expr = Expr;
+// Ref: https://en.cppreference.com/w/c/language/operator_precedence.html
 pub Expr: Expr = {
     #[precedence(level = "0")]
     Identifier => Expr::Identifier(<>),
     Litteral => Expr::Litteral(<>),
     "(" <e: ExprReset> ")" => e,
 
-    #[precedence(level = "10")] #[assoc(side="left")]
+    // #[precedence(level = "1")]
+    // <i: Identifier> "(" <p: Comma<Expr>> ")" => Expr::FunctionCall { name: i, parameters: p }
+
+    #[precedence(level = "3")] #[assoc(side="left")]
     <lhs: Expr> "*" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Mul },
     <lhs: Expr> "/" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Div },
     <lhs: Expr> "%" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Mod },
 
-    #[precedence(level = "11")] #[assoc(side="left")]
+    #[precedence(level = "4")] #[assoc(side="left")]
     <lhs: Expr> "+" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Add },
     <lhs: Expr> "-" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Sub },
     
-    #[precedence(level = "12")] #[assoc(side="left")]
+    #[precedence(level = "5")] #[assoc(side="left")]
     <lhs: Expr> "<<" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::ShiftLeft },
     <lhs: Expr> ">>" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::ShiftRight },
     
-    #[precedence(level = "13")] #[assoc(side="left")]
+    #[precedence(level = "6")] #[assoc(side="left")]
     <lhs: Expr> "<" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LessThan },
     <lhs: Expr> ">" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::GreaterThan },
     <lhs: Expr> "<=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LessOrEqual },
     <lhs: Expr> ">=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::GreaterOrEqual },
+
+    #[precedence(level = "7")] #[assoc(side="left")]
     <lhs: Expr> "==" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Equal },
     <lhs: Expr> "!=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Different },
     
-    #[precedence(level = "14")] #[assoc(side="left")]
+    #[precedence(level = "8")] #[assoc(side="left")]
     <lhs: Expr> "&" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::BAnd },
-    <lhs: Expr> "|" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::BOr },
+    #[precedence(level = "9")] #[assoc(side="left")]
     <lhs: Expr> "^" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Xor },
+    #[precedence(level = "10")] #[assoc(side="left")]
+    <lhs: Expr> "|" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::BOr },
     
-    #[precedence(level = "15")] #[assoc(side="left")]
+    #[precedence(level = "11")] #[assoc(side="left")]
     <lhs: Expr> "&&" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LAnd },
+    #[precedence(level = "12")] #[assoc(side="left")]
     <lhs: Expr> "||" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::LOr },
 
-    #[precedence(level = "20")]
-    <i: Identifier> "(" <p: Comma<Expr>> ")" => Expr::FunctionCall { name: i, parameters: p }
+    #[precedence(level = "14")] #[assoc(side="right")]
+    <lhs: Expr> "=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Assign },
+   
+    <lhs: Expr> "+=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Add },), op: BinOp::Assign },
+    <lhs: Expr> "-=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Sub },), op: BinOp::Assign },
+   
+    <lhs: Expr> "*=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Mul },), op: BinOp::Assign },
+    <lhs: Expr> "/=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Div },), op: BinOp::Assign },
+    <lhs: Expr> "%=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Mod },), op: BinOp::Assign },
+
+    <lhs: Expr> "<<=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::ShiftLeft },), op: BinOp::Assign },
+    <lhs: Expr> ">>=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::ShiftRight },), op: BinOp::Assign },
+
+    <lhs: Expr> "&=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::BAnd },), op: BinOp::Assign },
+    <lhs: Expr> "^=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::Xor },), op: BinOp::Assign },
+    <lhs: Expr> "|=" <rhs: Expr> => Expr::BinaryOperation { lhs: Box::new(lhs.clone()), rhs: Box::new(Expr::BinaryOperation { lhs: Box::new(lhs), rhs: Box::new(rhs), op: BinOp::BOr },), op: BinOp::Assign },
 };
 
 Identifier: String = <s:r"[_a-zA-Z]\w*"> => s.to_owned();

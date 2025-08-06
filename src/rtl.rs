@@ -22,6 +22,7 @@ enum BinaryOperator {
     Xor,
     LAnd,
     LOr,
+    Assign,
 }
 
 #[derive(Debug)]
@@ -206,6 +207,7 @@ impl Graph {
                     ast::BinOp::Xor => BinaryOperator::Xor,
                     ast::BinOp::LAnd => BinaryOperator::LAnd,
                     ast::BinOp::LOr => BinaryOperator::LOr,
+                    ast::BinOp::Assign => BinaryOperator::Assign,
                     ast::BinOp::Access | ast::BinOp::DerefAccess => panic!(),
                 };
 
@@ -546,6 +548,7 @@ pub mod visualisation {
                     rtl::BinaryOperator::Xor => "^",
                     rtl::BinaryOperator::LAnd => "&&",
                     rtl::BinaryOperator::LOr => "||",
+                    rtl::BinaryOperator::Assign => "=",
                 },
                 format_reg(rhs)
             ),

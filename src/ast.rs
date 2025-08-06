@@ -70,6 +70,7 @@ pub enum BinOp {
     LOr,
     Access,
     DerefAccess,
+    Assign,
 }
 
 #[derive(Debug, Clone)]
