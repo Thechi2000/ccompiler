@@ -435,7 +435,7 @@ impl Graph {
         for hdx in 0..self.nodes.len() {
             for prev in self.nodes[hdx].prev() {
                 if let Node::Fork { location, .. } = &self.nodes[prev]
-                    && dbg!(*location) == dbg!(hdx)
+                    && *location == hdx
                 {
                     continue;
                 }
@@ -601,8 +601,7 @@ pub mod visualisation {
     }
 
     pub fn generate_flowchart(graph: rtl::Graph) -> String {
-        dbg!(graph.nodes.iter().enumerate().collect::<Vec<_>>());
-        let node = dbg!(compile_nodes(&graph));
-        generate_flowchart_str(node)
+        let rot = compile_nodes(&graph);
+        generate_flowchart_str(rot)
     }
 }
