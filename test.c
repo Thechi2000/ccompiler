@@ -1,12 +1,21 @@
 int main() {
   int a = 5;
   int b = 2;
+  int c = 0;
 
-  if (a > b) {
-    a += b;
-  } else {
-    b += a;
+  while (c < a) {
+    c += b;
   }
 
-  return 0;
+  do {
+    c += b;
+  } while (c < a);
+
+  if (a > c) {
+    a = b;
+  } else {
+    a = c;
+  }
+
+  return c;
 }

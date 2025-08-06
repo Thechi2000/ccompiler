@@ -354,7 +354,12 @@ impl Graph {
     }
 
     fn add_while(&mut self, prev: NodeHandle, w: &ast::WhileStruct) -> NodeHandle {
-        let (cond, cond_hdx) = self.add_expr(prev, &w.condition);
+        let join_hdx = self.add(Node::Join {
+            prev: vec![prev],
+            next: 0,
+        });
+
+        let (cond, cond_hdx) = self.add_expr(join_hdx, &w.condition);
 
         let inv_cond = self.alloc_reg();
         let inv_cond_hdx = self.add(Node::BinOp {
@@ -364,11 +369,6 @@ impl Graph {
             lhs: RegLit::Reg(cond),
             rhs: RegLit::Lit(0),
             dst: inv_cond.clone(),
-        });
-
-        let join_hdx = self.add(Node::Join {
-            prev: vec![inv_cond_hdx],
-            next: 0,
         });
 
         let branch_hdx = self.add(Node::Fork {
@@ -631,15 +631,24 @@ pub mod visualisation {
             }
 
             let mut str = "flowchart\n".to_owned();
-            for node in nodes {
+            for node in &nodes {
                 str.push_str(&format!(
                     "  {node}[\"{}\"]\n",
-                    create_label(&graph.nodes[node])
+                    create_label(&graph.nodes[*node])
                 ));
             }
 
             for (from, to) in edges {
                 str.push_str(&format!("  {from} --> {to}\n"));
+            }
+
+            for node in nodes {
+                if matches!(
+                    graph.nodes[node],
+                    rtl::Node::Fork { .. } | rtl::Node::Join { .. }
+                ) {
+                    str.push_str(&format!("  {node}@{{ shape: diam}}\n"));
+                }
             }
 
             str
