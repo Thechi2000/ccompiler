@@ -56,8 +56,9 @@ fn main() {
                 .unwrap();
 
             let graph = rtl::compile(func);
+            let chart = rtl::visualisation::generate_flowchart(graph);
 
-            dbg!(graph);
+            println!("{}", chart);
         }
     }
 }

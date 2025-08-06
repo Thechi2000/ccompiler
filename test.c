@@ -3,9 +3,9 @@ int main() {
   int b = 2;
 
   if (a > b) {
-    return a;
+    a - b;
   } else {
-    return b;
+    a + b;
   }
 
   return 0;
