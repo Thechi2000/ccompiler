@@ -446,6 +446,32 @@ impl Graph {
             }
         }
     }
+
+    fn clean(&mut self) {
+        // Locate and remove Join nodes with exactly one predecessor.
+        for hdx in 0..self.nodes.len() {
+            if let Node::Join { prev, next } = &self.nodes[hdx]
+                && prev.len() == 1
+            {
+                let prev = prev[0];
+                let next = *next;
+
+                // If the next of the Join's predecessor points to join then replace it with the next of Join.
+                if let Some(old_next) = self.nodes[prev].next_mut()
+                    && *old_next == hdx
+                {
+                    *old_next = next;
+                }
+
+                // If the Join's predecessor is a Fork to the Join then replace it with the next of Join.
+                if let Node::Fork { location, .. } = &mut self.nodes[prev]
+                    && *location == hdx
+                {
+                    *location = next;
+                }
+            }
+        }
+    }
 }
 
 pub fn compile(tld: ast::TopLevelDeclaration) -> Graph {
@@ -458,6 +484,7 @@ pub fn compile(tld: ast::TopLevelDeclaration) -> Graph {
     let start = graph.add(Node::Start { next: 0 });
     graph.add_block(start, &statements);
     graph.populate_forward_edge();
+    graph.clean();
 
     graph
 }
