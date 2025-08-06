@@ -184,8 +184,8 @@ impl Graph {
     ) -> NodeHandle {
         match v {
             ast::Expr::BinaryOperation { lhs, rhs, op } => {
-                let (lhs_reg, hdx) = self.add_expr(prev, &lhs);
-                let (rhs_reg, hdx) = self.add_expr(hdx, &rhs);
+                let (lhs_reg, hdx) = self.add_expr(prev, lhs);
+                let (rhs_reg, hdx) = self.add_expr(hdx, rhs);
 
                 let op = match op {
                     ast::BinOp::Mul => BinaryOperator::Mul,
@@ -219,7 +219,7 @@ impl Graph {
                 })
             }
             ast::Expr::PreUnaryOperation { hs, op } => {
-                let (reg, expr_hdx) = self.add_expr(prev, &hs);
+                let (reg, expr_hdx) = self.add_expr(prev, hs);
 
                 self.add(match op {
                     ast::PreUnOp::Minus => Node::BinOp {
@@ -397,7 +397,7 @@ impl Graph {
 
         let post_body = self.add_statement(join_hdx, &dw.body);
 
-        let (cond, cond_hdx) = self.add_expr(prev, &dw.condition);
+        let (cond, cond_hdx) = self.add_expr(post_body, &dw.condition);
 
         let end_hdx = self.add(Node::Fork {
             prev: cond_hdx,
@@ -463,7 +463,7 @@ pub fn compile(tld: ast::TopLevelDeclaration) -> Graph {
 }
 
 pub mod visualisation {
-    use std::{collections::BTreeSet, fmt::format};
+    use std::collections::BTreeSet;
 
     use crate::rtl::{self};
 

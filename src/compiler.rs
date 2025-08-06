@@ -75,10 +75,10 @@ pub mod asm {
     impl Display for Operand {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                Operand::Reg(register) => f.write_fmt(format_args!("%{}", register)),
-                Operand::Imm(i) => f.write_fmt(format_args!("$0x{:x}", i)),
-                Operand::Mem(register, 0) => f.write_fmt(format_args!("(%{})", register)),
-                Operand::Mem(register, i) => f.write_fmt(format_args!("{}(%{})", i, register)),
+                Operand::Reg(register) => f.write_fmt(format_args!("%{register}")),
+                Operand::Imm(i) => f.write_fmt(format_args!("$0x{i:x}")),
+                Operand::Mem(register, 0) => f.write_fmt(format_args!("(%{register})")),
+                Operand::Mem(register, i) => f.write_fmt(format_args!("{i}(%{register})")),
             }
         }
     }
@@ -90,7 +90,7 @@ pub mod asm {
     }
 
     pub fn inst(name: &'static str, operands: Vec<Operand>) -> Inst {
-        return Inst { name, operands };
+        Inst { name, operands }
     }
 
     impl Display for Inst {
@@ -131,7 +131,7 @@ pub mod asm {
     impl Display for AssemblyOutput {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             for i in self.instructions.iter() {
-                f.write_fmt(format_args!("{}\n", i))?;
+                f.write_fmt(format_args!("{i}\n"))?;
             }
 
             Ok(())
@@ -173,17 +173,17 @@ impl Context {
 pub type VariableMap = BTreeMap<String, asm::Register>;
 
 pub fn compile_expr(expr: Expr, context: &Context) -> AssemblyOutput {
-    use asm::inst;
     use asm::Operand::*;
     use asm::Register::*;
+    use asm::inst;
 
     let mut out = Default::default();
 
     fn inner(expr: &Expr, out: &mut AssemblyOutput, context: &Context) {
         match expr {
             Expr::BinaryOperation { lhs, rhs, op } => {
-                inner(&lhs, out, context);
-                inner(&rhs, out, context);
+                inner(lhs, out, context);
+                inner(rhs, out, context);
 
                 match op {
                     BinOp::Div | BinOp::Mod => {
@@ -250,7 +250,7 @@ pub fn compile_expr(expr: Expr, context: &Context) -> AssemblyOutput {
             Expr::Identifier(i) => {
                 let offset = context.get_var(i).expect("Unknown variable name");
                 out.add1("push", Mem(Rbp, offset as i32));
-            },
+            }
             Expr::Litteral(Litteral::Integer(i)) => out.add1("push", Imm(*i as i32)),
             Expr::Litteral(Litteral::String(s)) => todo!(),
             Expr::FunctionCall { name, parameters } => todo!(),

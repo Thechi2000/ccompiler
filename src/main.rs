@@ -58,7 +58,7 @@ fn main() {
             let graph = rtl::compile(func);
             let chart = rtl::visualisation::generate_flowchart(graph);
 
-            println!("{}", chart);
+            println!("{chart}");
         }
     }
 }
