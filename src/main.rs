@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read};
 
-use clap::{Parser, Subcommand, command};
+use clap::{Parser, Subcommand, ValueEnum, command};
 use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(grammar);
@@ -17,15 +17,27 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Target {
-    Parse { file: String },
-    Rtl { file: String },
+    Parse {
+        file: String,
+    },
+    Rtl {
+        file: String,
+        #[arg(short, long)]
+        output: GraphType,
+    },
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum GraphType {
+    Mermaid,
+    Flowchart,
 }
 
 fn main() {
     let cli = Cli::parse();
 
     let file = match &cli.target {
-        Target::Parse { file } | Target::Rtl { file } => file,
+        Target::Parse { file } | Target::Rtl { file, .. } => file,
     };
 
     let mut str = String::new();
@@ -41,15 +53,19 @@ fn main() {
                 grammar::TopLevelDeclarationParser::new().parse(&str)
             )
         }
-        Target::Rtl { .. } => {
+        Target::Rtl { output, .. } => {
             let func = grammar::TopLevelDeclarationParser::new()
                 .parse(&str)
                 .unwrap();
 
             let graph = rtl::compile(func);
-            let chart = rtl::visualisation::generate_flowchart(graph);
 
-            println!("{chart}");
+            let output = match output {
+                GraphType::Mermaid => rtl::visualisation::generate_mermaid(graph),
+                GraphType::Flowchart => rtl::visualisation::generate_flowchart(graph),
+            };
+
+            println!("{output}");
         }
     }
 }

@@ -22,7 +22,6 @@ enum BinaryOperator {
     Xor,
     LAnd,
     LOr,
-    Assign,
 }
 
 #[derive(Debug)]
@@ -207,7 +206,15 @@ impl Graph {
                     ast::BinOp::Xor => BinaryOperator::Xor,
                     ast::BinOp::LAnd => BinaryOperator::LAnd,
                     ast::BinOp::LOr => BinaryOperator::LOr,
-                    ast::BinOp::Assign => BinaryOperator::Assign,
+                    ast::BinOp::Assign => {
+                        return self.add(Node::UnOp {
+                            prev: hdx,
+                            next: 0,
+                            op: UnaryOperator::Assign,
+                            hs: RegLit::Reg(rhs_reg),
+                            dst: lhs_reg,
+                        });
+                    }
                     ast::BinOp::Access | ast::BinOp::DerefAccess => panic!(),
                 };
 
@@ -492,26 +499,166 @@ pub fn compile(tld: ast::TopLevelDeclaration) -> Graph {
 }
 
 pub mod visualisation {
-    use std::collections::BTreeSet;
 
-    use crate::rtl::{self};
+    mod flowchart {
+        use std::collections::BTreeSet;
 
-    #[derive(Debug)]
-    struct Node {
-        id: usize,
-        children: Vec<Node>,
-        backward_edges: Vec<usize>,
-        label: String,
-    }
+        use crate::rtl::{self, visualisation::create_label};
 
-    fn format_reg(r: &rtl::RegLit) -> String {
-        match r {
-            rtl::RegLit::Reg(r) => r.to_owned(),
-            rtl::RegLit::Lit(l) => l.to_string(),
+        #[derive(Debug)]
+        struct Node {
+            id: usize,
+            children: Vec<Node>,
+            backward_edges: Vec<usize>,
+            label: String,
+        }
+
+        fn compile_nodes(graph: &rtl::Graph) -> Node {
+            fn compile_nodes_rec(
+                graph: &rtl::Graph,
+                existing_nodes: &mut BTreeSet<usize>,
+                id: rtl::NodeHandle,
+            ) -> Node {
+                existing_nodes.insert(id);
+                let mut children = vec![];
+                let mut backward_edges = vec![];
+
+                if let Some(next) = graph.nodes[id].next() {
+                    if existing_nodes.contains(&next) {
+                        backward_edges.push(next);
+                    } else {
+                        children.push(compile_nodes_rec(graph, existing_nodes, next));
+                    }
+                }
+
+                if let rtl::Node::Fork { location, .. } = graph.nodes[id] {
+                    if existing_nodes.contains(&location) {
+                        backward_edges.push(location);
+                    } else {
+                        children.push(compile_nodes_rec(graph, existing_nodes, location));
+                    }
+                }
+
+                Node {
+                    id,
+                    children,
+                    backward_edges,
+                    label: create_label(&graph.nodes[id]),
+                }
+            }
+
+            compile_nodes_rec(
+                graph,
+                &mut Default::default(),
+                graph
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .find(|n| matches!(n.1, rtl::Node::Start { .. }))
+                    .unwrap()
+                    .0,
+            )
+        }
+
+        fn generate_flowchart_str(node: Node) -> String {
+            fn generate_flowchart_str_rec(node: Node, indent: usize) -> String {
+                let indent_str = " ".repeat(indent);
+                let internal_indent_str = " ".repeat(indent + 2);
+
+                let mut str = format!("{indent_str}{} #{}\n", node.label, node.id);
+
+                for be in node.backward_edges {
+                    str.push_str(&internal_indent_str);
+                    str.push_str(&format!("(#{be})"));
+                    str.push('\n');
+                }
+
+                for child in node.children {
+                    str.push_str(&generate_flowchart_str_rec(child, indent + 2));
+                }
+
+                str
+            }
+
+            generate_flowchart_str_rec(node, 0)
+        }
+
+        pub fn generate_flowchart(graph: rtl::Graph) -> String {
+            let rot = compile_nodes(&graph);
+            generate_flowchart_str(rot)
         }
     }
 
+    pub mod mermaid {
+        use crate::rtl::{self, visualisation::create_label};
+
+        pub fn generate_mermaid(graph: rtl::Graph) -> String {
+            let mut edges = vec![];
+            let mut nodes = vec![];
+
+            let mut to_process = vec![0];
+
+            fn add(
+                curr: usize,
+                next: usize,
+                nodes: &mut Vec<usize>,
+                edges: &mut Vec<(usize, usize)>,
+                to_process: &mut Vec<usize>,
+            ) {
+                edges.push((curr, next));
+
+                if !nodes.contains(&next) {
+                    to_process.push(next);
+                }
+            }
+
+            while let Some(hdx) = to_process.pop() {
+                nodes.push(hdx);
+
+                match &graph.nodes[hdx] {
+                    rtl::Node::Start { next }
+                    | rtl::Node::UnOp { next, .. }
+                    | rtl::Node::BinOp { next, .. }
+                    | rtl::Node::Join { next, .. } => {
+                        add(hdx, *next, &mut nodes, &mut edges, &mut to_process);
+                    }
+                    rtl::Node::Fork { location, next, .. } => {
+                        add(hdx, *next, &mut nodes, &mut edges, &mut to_process);
+                        add(hdx, *location, &mut nodes, &mut edges, &mut to_process);
+                    }
+                    rtl::Node::Ret { .. } => {}
+                }
+            }
+
+            let mut str = "flowchart\n".to_owned();
+            for node in nodes {
+                str.push_str(&format!(
+                    "  {node}[\"{}\"]\n",
+                    create_label(&graph.nodes[node])
+                ));
+            }
+
+            for (from, to) in edges {
+                str.push_str(&format!("  {from} --> {to}\n"));
+            }
+
+            str
+        }
+    }
+
+    pub use flowchart::generate_flowchart;
+    pub use mermaid::generate_mermaid;
+
+    use crate::rtl;
+
     fn create_label(node: &rtl::Node) -> String {
+        fn format_reg(r: &rtl::RegLit) -> String {
+            match r {
+                rtl::RegLit::Reg(r) => r.to_owned(),
+                rtl::RegLit::Lit(l) => l.to_string(),
+            }
+        }
+
         match node {
             rtl::Node::Start { .. } => "Start".to_owned(),
             rtl::Node::UnOp { op, hs, dst, .. } => format!(
@@ -548,7 +695,6 @@ pub mod visualisation {
                     rtl::BinaryOperator::Xor => "^",
                     rtl::BinaryOperator::LAnd => "&&",
                     rtl::BinaryOperator::LOr => "||",
-                    rtl::BinaryOperator::Assign => "=",
                 },
                 format_reg(rhs)
             ),
@@ -558,80 +704,5 @@ pub mod visualisation {
                 format!("Ret {}", value.as_ref().map(format_reg).unwrap_or_default())
             }
         }
-    }
-
-    fn compile_nodes(graph: &rtl::Graph) -> Node {
-        fn compile_nodes_rec(
-            graph: &rtl::Graph,
-            existing_nodes: &mut BTreeSet<usize>,
-            id: rtl::NodeHandle,
-        ) -> Node {
-            existing_nodes.insert(id);
-            let mut children = vec![];
-            let mut backward_edges = vec![];
-
-            if let Some(next) = graph.nodes[id].next() {
-                if existing_nodes.contains(&next) {
-                    backward_edges.push(next);
-                } else {
-                    children.push(compile_nodes_rec(graph, existing_nodes, next));
-                }
-            }
-
-            if let rtl::Node::Fork { location, .. } = graph.nodes[id] {
-                if existing_nodes.contains(&location) {
-                    backward_edges.push(location);
-                } else {
-                    children.push(compile_nodes_rec(graph, existing_nodes, location));
-                }
-            }
-
-            Node {
-                id,
-                children,
-                backward_edges,
-                label: create_label(&graph.nodes[id]),
-            }
-        }
-
-        compile_nodes_rec(
-            graph,
-            &mut Default::default(),
-            graph
-                .nodes
-                .iter()
-                .enumerate()
-                .find(|n| matches!(n.1, rtl::Node::Start { .. }))
-                .unwrap()
-                .0,
-        )
-    }
-
-    fn generate_flowchart_str(node: Node) -> String {
-        fn generate_flowchart_str_rec(node: Node, indent: usize) -> String {
-            let indent_str = " ".repeat(indent);
-            let internal_indent_str = " ".repeat(indent + 2);
-
-            let mut str = format!("{indent_str}{} #{}\n", node.label, node.id);
-
-            for be in node.backward_edges {
-                str.push_str(&internal_indent_str);
-                str.push_str(&format!("(#{be})"));
-                str.push('\n');
-            }
-
-            for child in node.children {
-                str.push_str(&generate_flowchart_str_rec(child, indent + 2));
-            }
-
-            str
-        }
-
-        generate_flowchart_str_rec(node, 0)
-    }
-
-    pub fn generate_flowchart(graph: rtl::Graph) -> String {
-        let rot = compile_nodes(&graph);
-        generate_flowchart_str(rot)
     }
 }
