@@ -1,9 +1,12 @@
 use std::{collections::BTreeMap, vec};
 
-use crate::ast;
+use crate::{
+    ast,
+    graph::{self, Node as _, NodeHandle},
+};
 
 #[derive(Debug)]
-enum BinaryOperator {
+pub enum BinaryOperator {
     Mul,
     Div,
     Mod,
@@ -25,27 +28,26 @@ enum BinaryOperator {
 }
 
 #[derive(Debug)]
-enum UnaryOperator {
+pub enum UnaryOperator {
     Assign,
     Ref,
     Deref,
     BNot,
 }
 
-type NodeHandle = usize;
-type Register = String;
-type Function = NodeHandle;
+pub type Register = String;
+pub type Function = NodeHandle;
 
-type Litteral = i32;
+pub type Litteral = i32;
 
 #[derive(Debug)]
-enum RegLit {
+pub enum RegLit {
     Reg(Register),
     Lit(Litteral),
 }
 
 #[derive(Debug)]
-enum Node {
+pub enum Node {
     Start {
         next: NodeHandle,
     },
@@ -81,26 +83,6 @@ enum Node {
 }
 
 impl Node {
-    fn prev(&self) -> Vec<NodeHandle> {
-        match self {
-            Node::Start { .. } => vec![],
-            Node::UnOp { prev, .. }
-            | Node::BinOp { prev, .. }
-            | Node::Fork { prev, .. }
-            | Node::Ret { prev, .. } => vec![*prev],
-            Node::Join { prev, .. } => prev.clone(),
-        }
-    }
-    fn next(&self) -> Option<NodeHandle> {
-        match self {
-            Node::Ret { .. } => None,
-            Node::Start { next, .. }
-            | Node::UnOp { next, .. }
-            | Node::BinOp { next, .. }
-            | Node::Fork { next, .. }
-            | Node::Join { next, .. } => Some(*next),
-        }
-    }
     fn next_mut(&mut self) -> Option<&mut NodeHandle> {
         match self {
             Node::Ret { .. } => None,
@@ -114,7 +96,7 @@ impl Node {
 }
 
 pub struct Graph {
-    nodes: Vec<Node>,
+    pub nodes: Vec<Node>,
     functions: BTreeMap<String, Function>,
     register_generator: Box<dyn Iterator<Item = Register>>,
 }
@@ -508,220 +490,95 @@ pub fn compile(tld: ast::TopLevelDeclaration) -> Graph {
     graph
 }
 
-pub mod visualisation {
-
-    mod flowchart {
-        use std::collections::BTreeSet;
-
-        use crate::rtl::{self, visualisation::create_label};
-
-        #[derive(Debug)]
-        struct Node {
-            id: usize,
-            children: Vec<Node>,
-            backward_edges: Vec<usize>,
-            label: String,
+impl graph::Node for Node {
+    fn prev(&self) -> Vec<NodeHandle> {
+        match self {
+            Node::Start { .. } => vec![],
+            Node::UnOp { prev, .. }
+            | Node::BinOp { prev, .. }
+            | Node::Fork { prev, .. }
+            | Node::Ret { prev, .. } => vec![*prev],
+            Node::Join { prev, .. } => prev.clone(),
         }
-
-        fn compile_nodes(graph: &rtl::Graph) -> Node {
-            fn compile_nodes_rec(
-                graph: &rtl::Graph,
-                existing_nodes: &mut BTreeSet<usize>,
-                id: rtl::NodeHandle,
-            ) -> Node {
-                existing_nodes.insert(id);
-                let mut children = vec![];
-                let mut backward_edges = vec![];
-
-                if let Some(next) = graph.nodes[id].next() {
-                    if existing_nodes.contains(&next) {
-                        backward_edges.push(next);
-                    } else {
-                        children.push(compile_nodes_rec(graph, existing_nodes, next));
-                    }
-                }
-
-                if let rtl::Node::Fork { location, .. } = graph.nodes[id] {
-                    if existing_nodes.contains(&location) {
-                        backward_edges.push(location);
-                    } else {
-                        children.push(compile_nodes_rec(graph, existing_nodes, location));
-                    }
-                }
-
-                Node {
-                    id,
-                    children,
-                    backward_edges,
-                    label: create_label(&graph.nodes[id]),
-                }
-            }
-
-            compile_nodes_rec(
-                graph,
-                &mut Default::default(),
-                graph
-                    .nodes
-                    .iter()
-                    .enumerate()
-                    .find(|n| matches!(n.1, rtl::Node::Start { .. }))
-                    .unwrap()
-                    .0,
-            )
-        }
-
-        fn generate_flowchart_str(node: Node) -> String {
-            fn generate_flowchart_str_rec(node: Node, indent: usize) -> String {
-                let indent_str = " ".repeat(indent);
-                let internal_indent_str = " ".repeat(indent + 2);
-
-                let mut str = format!("{indent_str}{} #{}\n", node.label, node.id);
-
-                for be in node.backward_edges {
-                    str.push_str(&internal_indent_str);
-                    str.push_str(&format!("(#{be})"));
-                    str.push('\n');
-                }
-
-                for child in node.children {
-                    str.push_str(&generate_flowchart_str_rec(child, indent + 2));
-                }
-
-                str
-            }
-
-            generate_flowchart_str_rec(node, 0)
-        }
-
-        pub fn generate_flowchart(graph: rtl::Graph) -> String {
-            let rot = compile_nodes(&graph);
-            generate_flowchart_str(rot)
+    }
+    fn next(&self) -> Vec<NodeHandle> {
+        match self {
+            Node::Ret { .. } => vec![],
+            Node::Start { next, .. }
+            | Node::UnOp { next, .. }
+            | Node::BinOp { next, .. }
+            | Node::Join { next, .. } => vec![*next],
+            Node::Fork { next, location, .. } => vec![*next, *location],
         }
     }
 
-    pub mod mermaid {
-        use crate::rtl::{self, visualisation::create_label};
-
-        pub fn generate_mermaid(graph: rtl::Graph) -> String {
-            let mut edges = vec![];
-            let mut nodes = vec![];
-
-            let mut to_process = vec![0];
-
-            fn add(
-                curr: usize,
-                next: usize,
-                nodes: &mut Vec<usize>,
-                edges: &mut Vec<(usize, usize)>,
-                to_process: &mut Vec<usize>,
-            ) {
-                edges.push((curr, next));
-
-                if !nodes.contains(&next) {
-                    to_process.push(next);
-                }
-            }
-
-            while let Some(hdx) = to_process.pop() {
-                nodes.push(hdx);
-
-                match &graph.nodes[hdx] {
-                    rtl::Node::Start { next }
-                    | rtl::Node::UnOp { next, .. }
-                    | rtl::Node::BinOp { next, .. }
-                    | rtl::Node::Join { next, .. } => {
-                        add(hdx, *next, &mut nodes, &mut edges, &mut to_process);
-                    }
-                    rtl::Node::Fork { location, next, .. } => {
-                        add(hdx, *next, &mut nodes, &mut edges, &mut to_process);
-                        add(hdx, *location, &mut nodes, &mut edges, &mut to_process);
-                    }
-                    rtl::Node::Ret { .. } => {}
-                }
-            }
-
-            let mut str = "flowchart\n".to_owned();
-            for node in &nodes {
-                str.push_str(&format!(
-                    "  {node}[\"{}\"]\n",
-                    create_label(&graph.nodes[*node])
-                ));
-            }
-
-            for (from, to) in edges {
-                str.push_str(&format!("  {from} --> {to}\n"));
-            }
-
-            for node in nodes {
-                if matches!(
-                    graph.nodes[node],
-                    rtl::Node::Fork { .. } | rtl::Node::Join { .. }
-                ) {
-                    str.push_str(&format!("  {node}@{{ shape: diam}}\n"));
-                }
-            }
-
-            str
-        }
-    }
-
-    pub use flowchart::generate_flowchart;
-    pub use mermaid::generate_mermaid;
-
-    use crate::rtl;
-
-    fn create_label(node: &rtl::Node) -> String {
-        fn format_reg(r: &rtl::RegLit) -> String {
+    fn label(&self) -> String {
+        fn format_reg(r: &RegLit) -> String {
             match r {
-                rtl::RegLit::Reg(r) => r.to_owned(),
-                rtl::RegLit::Lit(l) => l.to_string(),
+                RegLit::Reg(r) => r.to_owned(),
+                RegLit::Lit(l) => l.to_string(),
             }
         }
 
-        match node {
-            rtl::Node::Start { .. } => "Start".to_owned(),
-            rtl::Node::UnOp { op, hs, dst, .. } => format!(
+        match self {
+            Node::Start { .. } => "Start".to_owned(),
+            Node::UnOp { op, hs, dst, .. } => format!(
                 "{dst} <- {}{}",
                 match op {
-                    rtl::UnaryOperator::Assign => "",
-                    rtl::UnaryOperator::Ref => "&",
-                    rtl::UnaryOperator::Deref => "*",
-                    rtl::UnaryOperator::BNot => "~",
+                    UnaryOperator::Assign => "",
+                    UnaryOperator::Ref => "&",
+                    UnaryOperator::Deref => "*",
+                    UnaryOperator::BNot => "~",
                 },
                 format_reg(hs)
             ),
-            rtl::Node::BinOp {
+            Node::BinOp {
                 op, lhs, rhs, dst, ..
             } => format!(
                 "{dst} <- {} {} {}",
                 format_reg(lhs),
                 match op {
-                    rtl::BinaryOperator::Mul => "*",
-                    rtl::BinaryOperator::Div => "/",
-                    rtl::BinaryOperator::Mod => "%",
-                    rtl::BinaryOperator::Add => "+",
-                    rtl::BinaryOperator::Sub => "-",
-                    rtl::BinaryOperator::ShiftLeft => "<<",
-                    rtl::BinaryOperator::ShiftRight => ">>",
-                    rtl::BinaryOperator::LessThan => "<",
-                    rtl::BinaryOperator::LessOrEqual => "<=",
-                    rtl::BinaryOperator::GreaterThan => ">",
-                    rtl::BinaryOperator::GreaterOrEqual => ">=",
-                    rtl::BinaryOperator::Equal => "==",
-                    rtl::BinaryOperator::Different => "!=",
-                    rtl::BinaryOperator::BAnd => "&",
-                    rtl::BinaryOperator::BOr => "|",
-                    rtl::BinaryOperator::Xor => "^",
-                    rtl::BinaryOperator::LAnd => "&&",
-                    rtl::BinaryOperator::LOr => "||",
+                    BinaryOperator::Mul => "*",
+                    BinaryOperator::Div => "/",
+                    BinaryOperator::Mod => "%",
+                    BinaryOperator::Add => "+",
+                    BinaryOperator::Sub => "-",
+                    BinaryOperator::ShiftLeft => "<<",
+                    BinaryOperator::ShiftRight => ">>",
+                    BinaryOperator::LessThan => "<",
+                    BinaryOperator::LessOrEqual => "<=",
+                    BinaryOperator::GreaterThan => ">",
+                    BinaryOperator::GreaterOrEqual => ">=",
+                    BinaryOperator::Equal => "==",
+                    BinaryOperator::Different => "!=",
+                    BinaryOperator::BAnd => "&",
+                    BinaryOperator::BOr => "|",
+                    BinaryOperator::Xor => "^",
+                    BinaryOperator::LAnd => "&&",
+                    BinaryOperator::LOr => "||",
                 },
                 format_reg(rhs)
             ),
-            rtl::Node::Fork { cond, .. } => format!("Fork {cond}"),
-            rtl::Node::Join { .. } => "Join".to_owned(),
-            rtl::Node::Ret { value, .. } => {
+            Node::Fork { cond, .. } => format!("Fork {cond}"),
+            Node::Join { .. } => "Join".to_owned(),
+            Node::Ret { value, .. } => {
                 format!("Ret {}", value.as_ref().map(format_reg).unwrap_or_default())
             }
         }
+    }
+}
+
+impl graph::Graph<Node> for Graph {
+    fn entrypoint(&self) -> NodeHandle {
+        self.nodes()
+            .iter()
+            .enumerate()
+            .find(|n| matches!(n.1, Node::Start { .. }))
+            .unwrap()
+            .0
+    }
+
+    fn nodes(&self) -> &[Node] {
+        &self.nodes
     }
 }

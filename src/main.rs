@@ -1,12 +1,16 @@
 use std::{fs::File, io::Read};
 
-use clap::{Parser, Subcommand, ValueEnum, command};
+use clap::{Parser, Subcommand};
 use lalrpop_util::lalrpop_mod;
+
+use crate::graph::visualisation::{GraphType, generate_representation};
 
 lalrpop_mod!(grammar);
 mod ast;
 mod compiler;
+mod graph;
 mod rtl;
+mod ssa;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -25,19 +29,18 @@ enum Target {
         #[arg(short, long)]
         output: GraphType,
     },
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum GraphType {
-    Mermaid,
-    Flowchart,
+    Ssa {
+        file: String,
+        #[arg(short, long)]
+        output: GraphType,
+    },
 }
 
 fn main() {
     let cli = Cli::parse();
 
     let file = match &cli.target {
-        Target::Parse { file } | Target::Rtl { file, .. } => file,
+        Target::Parse { file } | Target::Rtl { file, .. } | Target::Ssa { file, .. } => file,
     };
 
     let mut str = String::new();
@@ -60,12 +63,20 @@ fn main() {
 
             let graph = rtl::compile(func);
 
-            let output = match output {
-                GraphType::Mermaid => rtl::visualisation::generate_mermaid(graph),
-                GraphType::Flowchart => rtl::visualisation::generate_flowchart(graph),
-            };
-
+            let output = generate_representation(graph, output);
             println!("{output}");
+        }
+
+        Target::Ssa { output, .. } => {
+            let func = grammar::TopLevelDeclarationParser::new()
+                .parse(&str)
+                .unwrap();
+
+            let graph = rtl::compile(func);
+            let graph = ssa::compile(graph);
+
+            // let output = generate_representation(graph, output);
+            // println!("{output}");
         }
     }
 }
