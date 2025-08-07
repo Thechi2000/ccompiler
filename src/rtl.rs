@@ -168,7 +168,11 @@ impl Graph {
 
     fn add_expr(&mut self, prev: NodeHandle, expr: &ast::Expr) -> (Register, NodeHandle) {
         if let ast::Expr::Identifier(reg) = expr {
-            (reg.clone(), prev)
+            if !reg.starts_with("r#") {
+                (format!("i#{reg}"), prev)
+            } else {
+                (reg.clone(), prev)
+            }
         } else {
             let reg = self.alloc_reg();
             let hdx = self.add_declaration(prev, &reg, expr);
@@ -182,6 +186,12 @@ impl Graph {
         r: &ast::Identifier,
         v: &ast::Expr,
     ) -> NodeHandle {
+        let r = if !r.starts_with("r#") {
+            format!("i#{r}")
+        } else {
+            r.clone()
+        };
+
         match v {
             ast::Expr::BinaryOperation { lhs, rhs, op } => {
                 let (lhs_reg, hdx) = self.add_expr(prev, lhs);
