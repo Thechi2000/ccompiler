@@ -75,8 +75,8 @@ fn main() {
             let graph = rtl::compile(func);
             let graph = ssa::compile(graph);
 
-            // let output = generate_representation(graph, output);
-            // println!("{output}");
+            let output = generate_representation(graph, output);
+            println!("{output}");
         }
     }
 }
