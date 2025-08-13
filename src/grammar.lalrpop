@@ -223,3 +223,7 @@ FunctionParameter: (Type, Identifier) = {
 pub TopLevelDeclaration: TopLevelDeclaration = {
     <t: Type> <i: Identifier> "(" <p: FunctionParameter*> ")" "{" <b: Statement*> "}" => TopLevelDeclaration::Function { return_type: t, name: i, parameters: p, body: b }
 }
+
+pub File: Vec<TopLevelDeclaration> = {
+    <f: TopLevelDeclaration*> => f
+}

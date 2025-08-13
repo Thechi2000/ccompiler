@@ -49,6 +49,7 @@ pub enum RegLit {
 #[derive(Debug)]
 pub enum Node {
     Start {
+        name: String,
         next: NodeHandle,
     },
     UnOp {
@@ -475,15 +476,19 @@ impl Graph {
     }
 }
 
-pub fn compile(tld: ast::TopLevelDeclaration) -> Graph {
-    let ast::TopLevelDeclaration::Function {
-        body: statements, ..
-    } = tld;
-
+pub fn compile(tlds: Vec<ast::TopLevelDeclaration>) -> Graph {
     let mut graph = Graph::new();
 
-    let start = graph.add(Node::Start { next: 0 });
-    graph.add_block(start, &statements);
+    for tld in tlds {
+        let ast::TopLevelDeclaration::Function {
+            name,
+            body: statements,
+            ..
+        } = tld;
+
+        let start = graph.add(Node::Start { name, next: 0 });
+        graph.add_block(start, &statements);
+    }
     graph.populate_forward_edge();
     graph.clean();
 
@@ -521,7 +526,7 @@ impl graph::Node for Node {
         }
 
         match self {
-            Node::Start { .. } => "Start".to_owned(),
+            Node::Start { name, .. } => format!("{name}()"),
             Node::UnOp { op, hs, dst, .. } => format!(
                 "{dst} <- {}{}",
                 match op {
@@ -569,13 +574,13 @@ impl graph::Node for Node {
 }
 
 impl graph::Graph<Node> for Graph {
-    fn entrypoint(&self) -> NodeHandle {
+    fn entrypoints(&self) -> Vec<NodeHandle> {
         self.nodes()
             .iter()
             .enumerate()
-            .find(|n| matches!(n.1, Node::Start { .. }))
-            .unwrap()
-            .0
+            .filter(|n| matches!(n.1, Node::Start { .. }))
+            .map(|(hdx, _)| hdx)
+            .collect()
     }
 
     fn nodes(&self) -> &[Node] {

@@ -141,13 +141,15 @@ impl graph::Node for Node {
 }
 
 impl graph::Graph<Node> for Graph {
-    fn entrypoint(&self) -> NodeHandle {
-        self.nodes()
-            .iter()
-            .enumerate()
-            .find(|n| matches!(n.1, Node::Start { .. }))
-            .unwrap()
-            .0
+    fn entrypoints(&self) -> Vec<NodeHandle> {
+        vec![
+            self.nodes()
+                .iter()
+                .enumerate()
+                .find(|n| matches!(n.1, Node::Start { .. }))
+                .unwrap()
+                .0,
+        ]
     }
 
     fn nodes(&self) -> &[Node] {

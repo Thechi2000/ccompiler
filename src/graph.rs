@@ -1,7 +1,7 @@
 pub type NodeHandle = usize;
 
 pub trait Graph<N: Node> {
-    fn entrypoint(&self) -> NodeHandle;
+    fn entrypoints(&self) -> Vec<NodeHandle>;
 
     fn nodes(&self) -> &[N];
 }
@@ -27,7 +27,7 @@ pub mod visualisation {
             label: String,
         }
 
-        fn compile_nodes<N, G>(graph: &G) -> FlowNode
+        fn compile_nodes<N, G>(graph: &G) -> Vec<FlowNode>
         where
             N: Node,
             G: Graph<N>,
@@ -61,10 +61,14 @@ pub mod visualisation {
                 }
             }
 
-            compile_nodes_rec(graph, &mut Default::default(), graph.entrypoint())
+            graph
+                .entrypoints()
+                .into_iter()
+                .map(|hdx| compile_nodes_rec(graph, &mut Default::default(), hdx))
+                .collect()
         }
 
-        fn generate_flowchart_str(node: FlowNode) -> String {
+        fn generate_flowchart_str(nodes: Vec<FlowNode>) -> String {
             fn generate_flowchart_str_rec(node: FlowNode, indent: usize) -> String {
                 let indent_str = " ".repeat(indent);
                 let internal_indent_str = " ".repeat(indent + 2);
@@ -84,7 +88,11 @@ pub mod visualisation {
                 str
             }
 
-            generate_flowchart_str_rec(node, 0)
+            nodes
+                .into_iter()
+                .map(|n| generate_flowchart_str_rec(n, 0))
+                .collect::<Vec<_>>()
+                .join("\n")
         }
 
         pub fn generate_flowchart<N, G>(graph: G) -> String
@@ -108,7 +116,7 @@ pub mod visualisation {
             let mut edges = vec![];
             let mut nodes = vec![];
 
-            let mut to_process = vec![0];
+            let mut to_process = graph.entrypoints();
 
             while let Some(hdx) = to_process.pop() {
                 nodes.push(hdx);
@@ -135,6 +143,10 @@ pub mod visualisation {
                 if graph.nodes()[node].next().len() > 1 || graph.nodes()[node].prev().len() > 1 {
                     str.push_str(&format!("  {node}@{{ shape: diam}}\n"));
                 }
+            }
+
+            for node in graph.entrypoints() {
+                str.push_str(&format!("  {node}@{{ shape: card}}\n"));
             }
 
             str

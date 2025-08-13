@@ -57,22 +57,22 @@ fn main() {
             )
         }
         Target::Rtl { output, .. } => {
-            let func = grammar::TopLevelDeclarationParser::new()
+            let funcs = grammar::FileParser::new()
                 .parse(&str)
                 .unwrap();
 
-            let graph = rtl::compile(func);
+            let graph = rtl::compile(funcs);
 
             let output = generate_representation(graph, output);
             println!("{output}");
         }
 
         Target::Ssa { output, .. } => {
-            let func = grammar::TopLevelDeclarationParser::new()
+            let funcs = grammar::FileParser::new()
                 .parse(&str)
                 .unwrap();
 
-            let graph = rtl::compile(func);
+            let graph = rtl::compile(funcs);
             let graph = ssa::compile(graph);
 
             let output = generate_representation(graph, output);
