@@ -99,7 +99,7 @@ impl Node {
 pub struct Graph {
     pub nodes: Vec<Node>,
     functions: BTreeMap<String, Function>,
-    register_generator: Box<dyn Iterator<Item = Register>>,
+    pub(crate) register_generator: Box<dyn Iterator<Item = Register>>,
 }
 
 impl std::fmt::Debug for Graph {
