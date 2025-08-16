@@ -75,18 +75,19 @@ impl graph::Node for Node {
         }
     }
 
-    fn label(&self) -> String {
-        fn format_reg(r: &RegLit) -> String {
+    fn label<F: Fn(&str) -> String>(&self, regfmt: F) -> String {
+        let format_reg = |r: &RegLit| -> String {
             match r {
-                RegLit::Reg(r) => r.to_owned(),
+                RegLit::Reg(r) => regfmt(r),
                 RegLit::Lit(l) => l.to_string(),
             }
-        }
+        };
 
         match self {
             Node::Start { name, .. } => format!("{name}()"),
             Node::UnOp { op, hs, dst, .. } => format!(
-                "{dst} <- {}{}",
+                "{} <- {}{}",
+                regfmt(dst),
                 match op {
                     UnaryOperator::Assign => "",
                     UnaryOperator::Ref => "&",
@@ -98,7 +99,8 @@ impl graph::Node for Node {
             Node::BinOp {
                 op, lhs, rhs, dst, ..
             } => format!(
-                "{dst} <- {} {} {}",
+                "{} <- {} {} {}",
+                regfmt(dst),
                 format_reg(lhs),
                 match op {
                     BinaryOperator::Mul => "*",
@@ -122,10 +124,19 @@ impl graph::Node for Node {
                 },
                 format_reg(rhs)
             ),
-            Node::Fork { cond, .. } => format!("Fork {cond}"),
+            Node::Fork { cond, .. } => format!("Fork {}", regfmt(cond)),
             Node::Join { joins, .. } => joins
                 .values()
-                .map(|(dst, srcs)| format!("{dst} <- Φ({})", srcs.join(", ")))
+                .map(|(dst, srcs)| {
+                    format!(
+                        "{} <- Φ({})",
+                        regfmt(dst),
+                        srcs.iter()
+                            .map(|r| regfmt(r))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join("\n"),
             Node::Ret { value, .. } => {

@@ -517,18 +517,19 @@ impl graph::Node for Node {
         }
     }
 
-    fn label(&self) -> String {
-        fn format_reg(r: &RegLit) -> String {
+    fn label<F: Fn(&str) -> String>(&self, regfmt: F) -> String {
+        let format_reg = |r: &RegLit| -> String {
             match r {
-                RegLit::Reg(r) => r.to_owned(),
+                RegLit::Reg(r) => regfmt(r),
                 RegLit::Lit(l) => l.to_string(),
             }
-        }
+        };
 
         match self {
             Node::Start { name, .. } => format!("{name}()"),
             Node::UnOp { op, hs, dst, .. } => format!(
-                "{dst} <- {}{}",
+                "{} <- {}{}",
+                regfmt(dst),
                 match op {
                     UnaryOperator::Assign => "",
                     UnaryOperator::Ref => "&",
@@ -540,7 +541,8 @@ impl graph::Node for Node {
             Node::BinOp {
                 op, lhs, rhs, dst, ..
             } => format!(
-                "{dst} <- {} {} {}",
+                "{} <- {} {} {}",
+                regfmt(dst),
                 format_reg(lhs),
                 match op {
                     BinaryOperator::Mul => "*",
@@ -564,7 +566,7 @@ impl graph::Node for Node {
                 },
                 format_reg(rhs)
             ),
-            Node::Fork { cond, .. } => format!("Fork {cond}"),
+            Node::Fork { cond, .. } => format!("Fork {}", regfmt(cond)),
             Node::Join { .. } => "Join".to_owned(),
             Node::Ret { value, .. } => {
                 format!("Ret {}", value.as_ref().map(format_reg).unwrap_or_default())

@@ -1,3 +1,5 @@
+use crate::rtl::RegLit;
+
 pub type NodeHandle = usize;
 
 pub trait Graph<N: Node> {
@@ -10,14 +12,17 @@ pub trait Node {
     fn prev(&self) -> Vec<NodeHandle>;
     fn next(&self) -> Vec<NodeHandle>;
 
-    fn label(&self) -> String;
+    fn label<F: Fn(&str) -> String>(&self, regfmt: F) -> String;
 }
 
 pub mod visualisation {
     mod flowchart {
         use std::collections::BTreeSet;
 
-        use crate::graph::{self, Graph, Node};
+        use crate::{
+            graph::{self, Graph, Node},
+            rtl::RegLit,
+        };
 
         #[derive(Debug)]
         struct FlowNode {
@@ -57,7 +62,7 @@ pub mod visualisation {
                     id,
                     children,
                     backward_edges,
-                    label: graph.nodes()[id].label(),
+                    label: graph.nodes()[id].label(|r| r.to_owned()),
                 }
             }
 
@@ -132,7 +137,26 @@ pub mod visualisation {
 
             let mut str = "flowchart\n".to_owned();
             for node in &nodes {
-                str.push_str(&format!("  {node}[\"{}\"]\n", graph.nodes()[*node].label()));
+                str.push_str(&format!(
+                    "  {node}[\"{}\"]\n",
+                    graph.nodes()[*node].label(|r| {
+                        let parts = r.split("#").collect::<Vec<_>>();
+
+                        if parts[0] == "i" {
+                            if !parts.last().unwrap().chars().all(|c| c.is_ascii_digit()) {
+                                parts[1].to_owned()
+                            } else {
+                                format!(
+                                    "{}<sub>{}</sub>",
+                                    parts[1..parts.len() - 1].join("."),
+                                    parts.last().unwrap()
+                                )
+                            }
+                        } else {
+                            format!("#r<sub>{}</sub>", parts.last().unwrap())
+                        }
+                    })
+                ));
             }
 
             for (from, to) in edges {
