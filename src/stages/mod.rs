@@ -2,6 +2,9 @@
 
 use crate::ast::PrimitiveSizedType;
 
+pub mod rtl;
+pub mod ssa;
+
 /// Represents a simple variable that can be manipulated through assembly instructions.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Variable {

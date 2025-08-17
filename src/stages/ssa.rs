@@ -1,9 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    common::*,
-    graph::{self, Graph as _, Node as _, NodeHandle},
-    rtl::{self},
+    stages::*,
+    visualization::graph::{self, Graph as _, Node as _, NodeHandle},
 };
 
 pub struct Graph {

@@ -3,15 +3,15 @@ use std::{fs::File, io::Read};
 use clap::{Parser, Subcommand};
 use lalrpop_util::lalrpop_mod;
 
-use crate::graph::{GraphType, generate_representation};
+use crate::{
+    stages::{rtl, ssa},
+    visualization::graph::{GraphType, generate_representation},
+};
 
 lalrpop_mod!(grammar);
 mod ast;
-mod compiler;
-mod graph;
-mod rtl;
-mod ssa;
-mod common;
+mod stages;
+mod visualization;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -58,9 +58,7 @@ fn main() {
             )
         }
         Target::Rtl { output, .. } => {
-            let funcs = grammar::FileParser::new()
-                .parse(&str)
-                .unwrap();
+            let funcs = grammar::FileParser::new().parse(&str).unwrap();
 
             let graph = rtl::compile(funcs);
 
@@ -69,9 +67,7 @@ fn main() {
         }
 
         Target::Ssa { output, .. } => {
-            let funcs = grammar::FileParser::new()
-                .parse(&str)
-                .unwrap();
+            let funcs = grammar::FileParser::new().parse(&str).unwrap();
 
             let graph = rtl::compile(funcs);
             let graph = ssa::compile(graph);

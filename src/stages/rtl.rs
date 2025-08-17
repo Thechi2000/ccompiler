@@ -1,7 +1,7 @@
 use crate::{
     ast,
-    common::*,
-    graph::{self, Node as _, NodeHandle},
+    stages::*,
+    visualization::graph::{self, Node as _, NodeHandle},
 };
 
 #[derive(Debug)]
