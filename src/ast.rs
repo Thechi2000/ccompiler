@@ -2,13 +2,13 @@
 
 #[derive(Debug, Clone)]
 pub enum PrimitiveType {
-    Char,
-    Int,
-    Long,
+    UInteger,
+    SInteger,
     Float,
-    Double,
     Void,
 }
+#[derive(Debug, Clone)]
+pub struct PrimitiveSizedType(pub PrimitiveType, pub usize);
 #[derive(Debug, Clone)]
 pub enum TypeSpecifier {
     Long,
@@ -23,10 +23,53 @@ pub enum TypeQualifier {
     Volatile,
 }
 
+impl PrimitiveSizedType {
+    fn min_size(&self) -> usize {
+        match &self.0 {
+            PrimitiveType::UInteger | PrimitiveType::SInteger => 1,
+            PrimitiveType::Float => 8,
+            PrimitiveType::Void => 0,
+        }
+    }
+    fn max_size(&self) -> usize {
+        match &self.0 {
+            PrimitiveType::UInteger | PrimitiveType::SInteger | PrimitiveType::Float => 8,
+            PrimitiveType::Void => 0,
+        }
+    }
+    fn map_size<F: FnOnce(usize) -> usize>(self, f: F) -> Self {
+        let new_size = f(self.1);
+        if !(self.min_size()..=self.max_size()).contains(&new_size) {
+            panic!();
+        }
+        Self(self.0, new_size)
+    }
+
+    pub fn with_specifier(self, spec: TypeSpecifier) -> Self {
+        match spec {
+            TypeSpecifier::Long => self.map_size(|s| s * 2),
+            TypeSpecifier::Short => self.map_size(|s| s / 2),
+            TypeSpecifier::Unsigned => {
+                assert!(matches!(
+                    self.0,
+                    PrimitiveType::UInteger | PrimitiveType::SInteger
+                ));
+                Self(PrimitiveType::UInteger, self.1)
+            }
+            TypeSpecifier::Signed => {
+                assert!(matches!(
+                    self.0,
+                    PrimitiveType::UInteger | PrimitiveType::SInteger
+                ));
+                Self(PrimitiveType::SInteger, self.1)
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Type {
-    pub primitive: PrimitiveType,
-    pub specifiers: Vec<TypeSpecifier>,
+    pub primitive: PrimitiveSizedType,
     pub qualifiers: Vec<TypeQualifier>,
 }
 

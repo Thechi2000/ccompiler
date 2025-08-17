@@ -96,13 +96,13 @@ match {
     r"[_a-zA-Z]\w*"
 }
 
-pub PrimitiveType: PrimitiveType = {
-    "char" => PrimitiveType::Char,
-    "int" => PrimitiveType::Int,
-    "long" => PrimitiveType::Long,
-    "float" => PrimitiveType::Float,
-    "double" => PrimitiveType::Double,
-    "void" => PrimitiveType::Void,
+pub PrimitiveSizedType: PrimitiveSizedType = {
+    "char" => PrimitiveSizedType(PrimitiveType::SInteger, 1),
+    "int" => PrimitiveSizedType(PrimitiveType::SInteger, 4),
+    "long" => PrimitiveSizedType(PrimitiveType::SInteger, 8),
+    "float" => PrimitiveSizedType(PrimitiveType::Float, 4),
+    "double" => PrimitiveSizedType(PrimitiveType::Float, 8),
+    "void" => PrimitiveSizedType(PrimitiveType::Void, 0),
 };
 
 
@@ -121,9 +121,8 @@ pub TypeQualifier: TypeQualifier = {
 };
 
 pub Type: Type = {
-    <q: TypeQualifier*> <s: TypeSpecifier*> <t: PrimitiveType> => Type {
-        primitive: t,
-        specifiers: s,
+    <q: TypeQualifier*> <s: TypeSpecifier*> <t: PrimitiveSizedType> => Type {
+        primitive: s.into_iter().fold(t, PrimitiveSizedType::with_specifier),
         qualifiers: q,
     }
 }
