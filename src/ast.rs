@@ -1,76 +1,68 @@
 #![allow(unused)]
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum PrimitiveType {
-    UInteger,
-    SInteger,
-    Float,
-    Void,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PrimitiveSizedType(pub PrimitiveType, pub usize);
-#[derive(Debug, Clone, Copy)]
-pub enum TypeSpecifier {
-    Long,
-    Short,
-    Unsigned,
-    Signed,
-}
-#[derive(Debug, Clone, Copy)]
-pub enum TypeQualifier {
-    Const,
-    Restrict,
-    Volatile,
-}
+pub use typing::*;
+mod typing {
+    use super::*;
 
-impl PrimitiveSizedType {
-    fn min_size(&self) -> usize {
-        match &self.0 {
-            PrimitiveType::UInteger | PrimitiveType::SInteger => 1,
-            PrimitiveType::Float => 8,
-            PrimitiveType::Void => 0,
-        }
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum PrimitiveTypeSpecifier {
+        Long,
+        Short,
+        Unsigned,
+        Signed,
     }
-    fn max_size(&self) -> usize {
-        match &self.0 {
-            PrimitiveType::UInteger | PrimitiveType::SInteger | PrimitiveType::Float => 8,
-            PrimitiveType::Void => 0,
-        }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum PrimitiveType {
+        Char,
+        Int,
+        Long,
+        Float,
+        Double,
     }
-    fn map_size<F: FnOnce(usize) -> usize>(self, f: F) -> Self {
-        let new_size = f(self.1);
-        if !(self.min_size()..=self.max_size()).contains(&new_size) {
-            panic!();
-        }
-        Self(self.0, new_size)
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct ItemPrimitive {
+        pub ty: PrimitiveType,
+        pub specs: Vec<PrimitiveTypeSpecifier>,
     }
 
-    pub fn with_specifier(self, spec: TypeSpecifier) -> Self {
-        match spec {
-            TypeSpecifier::Long => self.map_size(|s| s * 2),
-            TypeSpecifier::Short => self.map_size(|s| s / 2),
-            TypeSpecifier::Unsigned => {
-                assert!(matches!(
-                    self.0,
-                    PrimitiveType::UInteger | PrimitiveType::SInteger
-                ));
-                Self(PrimitiveType::UInteger, self.1)
-            }
-            TypeSpecifier::Signed => {
-                assert!(matches!(
-                    self.0,
-                    PrimitiveType::UInteger | PrimitiveType::SInteger
-                ));
-                Self(PrimitiveType::SInteger, self.1)
-            }
-        }
+    #[derive(Debug, Clone)]
+    pub struct ItemStruct {
+        pub ident: Option<Identifier>,
+        pub fields: Vec<(Identifier, Type)>,
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct Type {
-    pub primitive: PrimitiveSizedType,
-    pub qualifiers: Vec<TypeQualifier>,
+    #[derive(Debug, Clone)]
+    pub struct ItemUnion {
+        pub ident: Option<Identifier>,
+        pub fields: Vec<(Identifier, Type)>,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct ItemPointer {
+        pub ty: Box<Type>,
+        pub quals: Vec<TypeQualifier>,
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum ItemType {
+        Primitive(ItemPrimitive),
+        Struct(ItemStruct),
+        Union(ItemUnion),
+        Pointer(ItemPointer),
+        Void,
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum TypeQualifier {
+        Restrict,
+        Volatile,
+        Const,
+    }
+    #[derive(Debug, Clone)]
+    pub struct Type {
+        pub ty: ItemType,
+        pub quals: Vec<TypeQualifier>,
+    }
 }
 
 #[derive(Debug, Clone)]
