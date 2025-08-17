@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
+    common::*,
     graph::{self, Graph as _, Node as _, NodeHandle},
-    rtl::{self, BinaryOperator, RegLit, Register, UnaryOperator},
+    rtl::{self},
 };
 
 pub struct Graph {
@@ -25,31 +26,31 @@ pub enum Node {
         prev: NodeHandle,
         next: NodeHandle,
         op: UnaryOperator,
-        hs: RegLit,
-        dst: Register,
+        hs: Value,
+        dst: Variable,
     },
     BinOp {
         prev: NodeHandle,
         next: NodeHandle,
         op: BinaryOperator,
-        lhs: RegLit,
-        rhs: RegLit,
-        dst: Register,
+        lhs: Value,
+        rhs: Value,
+        dst: Variable,
     },
     Fork {
         prev: NodeHandle,
         location: NodeHandle,
         next: NodeHandle,
-        cond: Register,
+        cond: Variable,
     },
     Join {
-        joins: BTreeMap<Register, (Register, Vec<Register>)>,
+        joins: BTreeMap<Variable, (Variable, Vec<Variable>)>,
         prev: Vec<NodeHandle>,
         next: NodeHandle,
     },
     Ret {
         prev: NodeHandle,
-        value: Option<RegLit>,
+        value: Option<Value>,
     },
 }
 
@@ -75,14 +76,7 @@ impl graph::Node for Node {
         }
     }
 
-    fn label<F: Fn(&str) -> String>(&self, regfmt: F) -> String {
-        let format_reg = |r: &RegLit| -> String {
-            match r {
-                RegLit::Reg(r) => regfmt(r),
-                RegLit::Lit(l) => l.to_string(),
-            }
-        };
-
+    fn label<F: Fn(&Variable) -> String>(&self, regfmt: F) -> String {
         match self {
             Node::Start { name, .. } => format!("{name}()"),
             Node::UnOp { op, hs, dst, .. } => format!(
@@ -94,14 +88,14 @@ impl graph::Node for Node {
                     UnaryOperator::Deref => "*",
                     UnaryOperator::BNot => "~",
                 },
-                format_reg(hs)
+                hs.fmt(&regfmt)
             ),
             Node::BinOp {
                 op, lhs, rhs, dst, ..
             } => format!(
                 "{} <- {} {} {}",
                 regfmt(dst),
-                format_reg(lhs),
+                lhs.fmt(&regfmt),
                 match op {
                     BinaryOperator::Mul => "*",
                     BinaryOperator::Div => "/",
@@ -122,7 +116,7 @@ impl graph::Node for Node {
                     BinaryOperator::LAnd => "&&",
                     BinaryOperator::LOr => "||",
                 },
-                format_reg(rhs)
+                rhs.fmt(&regfmt)
             ),
             Node::Fork { cond, .. } => format!("Fork {}", regfmt(cond)),
             Node::Join { joins, .. } => joins
@@ -140,7 +134,10 @@ impl graph::Node for Node {
                 .collect::<Vec<_>>()
                 .join("\n"),
             Node::Ret { value, .. } => {
-                format!("Ret {}", value.as_ref().map(format_reg).unwrap_or_default())
+                format!(
+                    "Ret {}",
+                    value.as_ref().map(|s| s.fmt(&regfmt)).unwrap_or_default()
+                )
             }
         }
     }
@@ -162,16 +159,10 @@ impl graph::Graph<Node> for Graph {
 }
 
 pub fn compile(graph: rtl::Graph) -> Graph {
-    fn walk_variable(graph: &mut Graph, hdx: NodeHandle, old_name: &str) {
-        let mut idx = 0;
-        let mut next_name = || {
-            let res = format!("{old_name}#{idx}");
-            idx += 1;
-            res
-        };
-
+    fn walk_variable(graph: &mut Graph, hdx: NodeHandle, old_name: &Variable) {
+        let mut generator = Variable::generator_from_var(old_name);
         let mut visisted = BTreeSet::new();
-        let mut to_process = vec![(hdx, next_name())];
+        let mut to_process = vec![(hdx, generator.next().unwrap())];
 
         while let Some((hdx, mut name)) = to_process.pop() {
             let node = &mut graph.nodes[hdx];
@@ -179,9 +170,9 @@ pub fn compile(graph: rtl::Graph) -> Graph {
 
             match node {
                 Node::Join { joins, .. } => {
-                    name = match joins.entry(old_name.to_owned()) {
+                    name = match joins.entry(old_name.clone()) {
                         std::collections::btree_map::Entry::Vacant(vacant_entry) => {
-                            let dest = next_name();
+                            let dest = generator.next().unwrap();
                             vacant_entry.insert((dest.clone(), vec![name.clone()]));
                             dest
                         }
@@ -196,11 +187,11 @@ pub fn compile(graph: rtl::Graph) -> Graph {
                 Node::Start { .. } => {}
                 Node::UnOp { hs, dst, .. } => {
                     if dst == old_name {
-                        name = next_name();
+                        name = generator.next().unwrap();
                         *dst = name.clone();
                     }
 
-                    if let RegLit::Reg(r) = hs
+                    if let Value::Var(r) = hs
                         && r == old_name
                     {
                         *r = name.clone();
@@ -208,16 +199,16 @@ pub fn compile(graph: rtl::Graph) -> Graph {
                 }
                 Node::BinOp { lhs, rhs, dst, .. } => {
                     if dst == old_name {
-                        name = next_name();
+                        name = generator.next().unwrap();
                         *dst = name.clone();
                     }
 
-                    if let RegLit::Reg(r) = lhs
+                    if let Value::Var(r) = lhs
                         && r == old_name
                     {
                         *r = name.clone();
                     }
-                    if let RegLit::Reg(r) = rhs
+                    if let Value::Var(r) = rhs
                         && r == old_name
                     {
                         *r = name.clone();
@@ -225,7 +216,7 @@ pub fn compile(graph: rtl::Graph) -> Graph {
                 }
                 Node::Fork { .. } => {}
                 Node::Ret { value, .. } => {
-                    if let Some(RegLit::Reg(r)) = value
+                    if let Some(Value::Var(r)) = value
                         && r == old_name
                     {
                         *r = name.clone();
@@ -247,8 +238,8 @@ pub fn compile(graph: rtl::Graph) -> Graph {
         .nodes
         .iter()
         .filter_map(|n| match n {
-            rtl::Node::BinOp { dst, .. } if dst.starts_with("i#") => Some(dst.clone()),
-            rtl::Node::UnOp { dst, .. } if dst.starts_with("i#") => Some(dst.clone()),
+            rtl::Node::BinOp { dst, .. } if !dst.is_generated() => Some(dst.clone()),
+            rtl::Node::UnOp { dst, .. } if !dst.is_generated() => Some(dst.clone()),
             _ => None,
         })
         .collect::<BTreeSet<_>>();

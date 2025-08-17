@@ -11,6 +11,7 @@ mod compiler;
 mod graph;
 mod rtl;
 mod ssa;
+mod common;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]

@@ -1,50 +1,8 @@
-use std::{collections::BTreeMap, vec};
-
 use crate::{
     ast,
+    common::*,
     graph::{self, Node as _, NodeHandle},
 };
-
-#[derive(Debug)]
-pub enum BinaryOperator {
-    Mul,
-    Div,
-    Mod,
-    Add,
-    Sub,
-    ShiftLeft,
-    ShiftRight,
-    LessThan,
-    LessOrEqual,
-    GreaterThan,
-    GreaterOrEqual,
-    Equal,
-    Different,
-    BAnd,
-    BOr,
-    Xor,
-    LAnd,
-    LOr,
-}
-
-#[derive(Debug)]
-pub enum UnaryOperator {
-    Assign,
-    Ref,
-    Deref,
-    BNot,
-}
-
-pub type Register = String;
-pub type Function = NodeHandle;
-
-pub type Litteral = i32;
-
-#[derive(Debug)]
-pub enum RegLit {
-    Reg(Register),
-    Lit(Litteral),
-}
 
 #[derive(Debug)]
 pub enum Node {
@@ -56,22 +14,22 @@ pub enum Node {
         prev: NodeHandle,
         next: NodeHandle,
         op: UnaryOperator,
-        hs: RegLit,
-        dst: Register,
+        hs: Value,
+        dst: Variable,
     },
     BinOp {
         prev: NodeHandle,
         next: NodeHandle,
         op: BinaryOperator,
-        lhs: RegLit,
-        rhs: RegLit,
-        dst: Register,
+        lhs: Value,
+        rhs: Value,
+        dst: Variable,
     },
     Fork {
         prev: NodeHandle,
         location: NodeHandle,
         next: NodeHandle,
-        cond: Register,
+        cond: Variable,
     },
     Join {
         prev: Vec<NodeHandle>,
@@ -79,7 +37,7 @@ pub enum Node {
     },
     Ret {
         prev: NodeHandle,
-        value: Option<RegLit>,
+        value: Option<Value>,
     },
 }
 
@@ -98,16 +56,12 @@ impl Node {
 
 pub struct Graph {
     pub nodes: Vec<Node>,
-    functions: BTreeMap<String, Function>,
-    pub(crate) register_generator: Box<dyn Iterator<Item = Register>>,
+    pub(crate) register_generator: Box<dyn Iterator<Item = Variable>>,
 }
 
 impl std::fmt::Debug for Graph {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Graph")
-            .field("nodes", &self.nodes)
-            .field("functions", &self.functions)
-            .finish()
+        f.debug_struct("Graph").field("nodes", &self.nodes).finish()
     }
 }
 
@@ -115,8 +69,7 @@ impl Graph {
     fn new() -> Graph {
         Graph {
             nodes: Default::default(),
-            functions: Default::default(),
-            register_generator: Box::new((0..).map(|v| format!("r#{v}"))),
+            register_generator: Box::new(Variable::generator(None)),
         }
     }
 
@@ -134,7 +87,7 @@ impl Graph {
             ast::Statement::Declaration { variables, .. } => {
                 variables.iter().fold(prev, |acc, (r, v)| {
                     if let Some(v) = v {
-                        self.add_declaration(acc, r, v)
+                        self.add_declaration(acc, Variable::from_ident(r), v)
                     } else {
                         acc
                     }
@@ -149,32 +102,17 @@ impl Graph {
         }
     }
 
-    fn add_expr(&mut self, prev: NodeHandle, expr: &ast::Expr) -> (Register, NodeHandle) {
+    fn add_expr(&mut self, prev: NodeHandle, expr: &ast::Expr) -> (Variable, NodeHandle) {
         if let ast::Expr::Identifier(reg) = expr {
-            if !reg.starts_with("r#") {
-                (format!("i#{reg}"), prev)
-            } else {
-                (reg.clone(), prev)
-            }
+            (Variable::from_ident(reg), prev)
         } else {
             let reg = self.alloc_reg();
-            let hdx = self.add_declaration(prev, &reg, expr);
+            let hdx = self.add_declaration(prev, reg.clone(), expr);
             (reg, hdx)
         }
     }
 
-    fn add_declaration(
-        &mut self,
-        prev: NodeHandle,
-        r: &ast::Identifier,
-        v: &ast::Expr,
-    ) -> NodeHandle {
-        let r = if !r.starts_with("r#") {
-            format!("i#{r}")
-        } else {
-            r.clone()
-        };
-
+    fn add_declaration(&mut self, prev: NodeHandle, r: Variable, v: &ast::Expr) -> NodeHandle {
         match v {
             ast::Expr::BinaryOperation { lhs, rhs, op } => {
                 let (lhs_reg, hdx) = self.add_expr(prev, lhs);
@@ -204,7 +142,7 @@ impl Graph {
                             prev: hdx,
                             next: 0,
                             op: UnaryOperator::Assign,
-                            hs: RegLit::Reg(rhs_reg),
+                            hs: Value::Var(rhs_reg),
                             dst: lhs_reg,
                         });
                     }
@@ -215,8 +153,8 @@ impl Graph {
                     prev: hdx,
                     next: 0,
                     op,
-                    lhs: RegLit::Reg(lhs_reg),
-                    rhs: RegLit::Reg(rhs_reg),
+                    lhs: Value::Var(lhs_reg),
+                    rhs: Value::Var(rhs_reg),
                     dst: r.clone(),
                 })
             }
@@ -228,44 +166,44 @@ impl Graph {
                         prev: expr_hdx,
                         next: 0,
                         op: BinaryOperator::Sub,
-                        lhs: RegLit::Lit(0),
-                        rhs: RegLit::Reg(reg),
+                        lhs: Value::Lit(0),
+                        rhs: Value::Var(reg),
                         dst: r.clone(),
                     },
                     ast::PreUnOp::BNot => Node::UnOp {
                         prev: expr_hdx,
                         next: 0,
                         op: UnaryOperator::BNot,
-                        hs: RegLit::Reg(reg),
+                        hs: Value::Var(reg),
                         dst: r.clone(),
                     },
                     ast::PreUnOp::LNot => Node::BinOp {
                         prev: expr_hdx,
                         next: 0,
                         op: BinaryOperator::Equal,
-                        lhs: RegLit::Reg(reg),
-                        rhs: RegLit::Lit(0),
+                        lhs: Value::Var(reg),
+                        rhs: Value::Lit(0),
                         dst: r.clone(),
                     },
                     ast::PreUnOp::Ref => Node::UnOp {
                         prev: expr_hdx,
                         next: 0,
                         op: UnaryOperator::Ref,
-                        hs: RegLit::Reg(reg),
+                        hs: Value::Var(reg),
                         dst: r.clone(),
                     },
                     ast::PreUnOp::Deref => Node::UnOp {
                         prev: expr_hdx,
                         next: 0,
                         op: UnaryOperator::Deref,
-                        hs: RegLit::Reg(reg),
+                        hs: Value::Var(reg),
                         dst: r.clone(),
                     },
                     ast::PreUnOp::Plus => Node::UnOp {
                         prev: expr_hdx,
                         next: 0,
                         op: UnaryOperator::Assign,
-                        hs: RegLit::Reg(reg),
+                        hs: Value::Var(reg),
                         dst: r.clone(),
                     },
                     ast::PreUnOp::Incr | ast::PreUnOp::Decr => todo!(),
@@ -276,7 +214,7 @@ impl Graph {
                 prev,
                 next: 0,
                 op: UnaryOperator::Assign,
-                hs: RegLit::Reg(format!("i#{id}")),
+                hs: Value::Var(Variable::from_ident(id)),
                 dst: r.clone(),
             }),
             ast::Expr::Litteral(ast::Litteral::String(_)) => panic!(),
@@ -284,7 +222,7 @@ impl Graph {
                 prev,
                 next: 0,
                 op: UnaryOperator::Assign,
-                hs: RegLit::Lit(*i as i32),
+                hs: Value::Lit(*i as i32),
                 dst: r.clone(),
             }),
             ast::Expr::FunctionCall { .. } => todo!(),
@@ -299,8 +237,8 @@ impl Graph {
             prev: cond_hdx,
             next: 0,
             op: BinaryOperator::Equal,
-            lhs: RegLit::Reg(cond),
-            rhs: RegLit::Lit(0),
+            lhs: Value::Var(cond),
+            rhs: Value::Lit(0),
             dst: inv_cond.clone(),
         });
 
@@ -359,8 +297,8 @@ impl Graph {
             prev: cond_hdx,
             next: 0,
             op: BinaryOperator::Equal,
-            lhs: RegLit::Reg(cond),
-            rhs: RegLit::Lit(0),
+            lhs: Value::Var(cond),
+            rhs: Value::Lit(0),
             dst: inv_cond.clone(),
         });
 
@@ -425,11 +363,11 @@ impl Graph {
 
         self.add(Node::Ret {
             prev: new_prev.unwrap_or(prev),
-            value: ret_value.map(RegLit::Reg),
+            value: ret_value.map(Value::Var),
         })
     }
 
-    fn alloc_reg(&mut self) -> Register {
+    fn alloc_reg(&mut self) -> Variable {
         self.register_generator.next().unwrap()
     }
 
@@ -517,14 +455,7 @@ impl graph::Node for Node {
         }
     }
 
-    fn label<F: Fn(&str) -> String>(&self, regfmt: F) -> String {
-        let format_reg = |r: &RegLit| -> String {
-            match r {
-                RegLit::Reg(r) => regfmt(r),
-                RegLit::Lit(l) => l.to_string(),
-            }
-        };
-
+    fn label<F: Fn(&Variable) -> String>(&self, regfmt: F) -> String {
         match self {
             Node::Start { name, .. } => format!("{name}()"),
             Node::UnOp { op, hs, dst, .. } => format!(
@@ -536,14 +467,14 @@ impl graph::Node for Node {
                     UnaryOperator::Deref => "*",
                     UnaryOperator::BNot => "~",
                 },
-                format_reg(hs)
+                hs.fmt(&regfmt)
             ),
             Node::BinOp {
                 op, lhs, rhs, dst, ..
             } => format!(
                 "{} <- {} {} {}",
                 regfmt(dst),
-                format_reg(lhs),
+                lhs.fmt(&regfmt),
                 match op {
                     BinaryOperator::Mul => "*",
                     BinaryOperator::Div => "/",
@@ -564,12 +495,15 @@ impl graph::Node for Node {
                     BinaryOperator::LAnd => "&&",
                     BinaryOperator::LOr => "||",
                 },
-                format_reg(rhs)
+                rhs.fmt(&regfmt)
             ),
             Node::Fork { cond, .. } => format!("Fork {}", regfmt(cond)),
             Node::Join { .. } => "Join".to_owned(),
             Node::Ret { value, .. } => {
-                format!("Ret {}", value.as_ref().map(format_reg).unwrap_or_default())
+                format!(
+                    "Ret {}",
+                    value.as_ref().map(|v| v.fmt(&regfmt)).unwrap_or_default()
+                )
             }
         }
     }
