@@ -1,22 +1,22 @@
 #![allow(unused)]
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PrimitiveType {
     UInteger,
     SInteger,
     Float,
     Void,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PrimitiveSizedType(pub PrimitiveType, pub usize);
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TypeSpecifier {
     Long,
     Short,
     Unsigned,
     Signed,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TypeQualifier {
     Const,
     Restrict,

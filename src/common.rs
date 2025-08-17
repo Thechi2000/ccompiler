@@ -1,28 +1,51 @@
 //! Structures and enumeration that are used accross multiple compilation stages.
 
+use crate::ast::PrimitiveSizedType;
+
 /// Represents a simple variable that can be manipulated through assembly instructions.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Variable {
     /// Original identifier of the variable, or `None` in case the variable was algorithmically generated.
-    name: Option<String>,
+    pub name: Option<String>,
     /// Declination index, when there is a name clash, e.g. due to scoping, or when a single variable is deconstructed
     /// into multiple instance (during SSA generation).
-    variant: usize,
+    pub variant: usize,
     // TODO: add type and memory size.
+    pub prim: PrimitiveSizedType,
 }
 
 /// Iterator utilitary used to generated multiple declinations of a variable from a single name.
-struct VariableGenerator {
+pub struct VariableGenerator {
     name: Option<String>,
     variant: usize,
 }
-impl Iterator for VariableGenerator {
-    type Item = Variable;
 
-    fn next(&mut self) -> Option<Self::Item> {
+impl VariableGenerator {
+    pub fn next(&mut self, prim: PrimitiveSizedType) -> Option<Variable> {
         let next = Some(Variable {
             name: self.name.clone(),
             variant: self.variant,
+            prim,
+        });
+
+        self.variant += 1;
+
+        next
+    }
+}
+
+pub struct TypedVariableGenerator {
+    name: Option<String>,
+    variant: usize,
+    prim: PrimitiveSizedType,
+}
+
+impl TypedVariableGenerator {
+    pub fn next(&mut self) -> Option<Variable> {
+        let next = Some(Variable {
+            name: self.name.clone(),
+            variant: self.variant,
+            prim: self.prim,
         });
 
         self.variant += 1;
@@ -33,7 +56,7 @@ impl Iterator for VariableGenerator {
 
 impl Variable {
     /// Creates an iterator yielding `Variables` composed from the given `ident` and different declination indexes.
-    pub fn generator(ident: Option<String>) -> impl Iterator<Item = Self> {
+    pub fn generator(ident: Option<String>) -> VariableGenerator {
         VariableGenerator {
             name: ident,
             variant: 0,
@@ -42,17 +65,19 @@ impl Variable {
 
     /// Creates an iterator yielding `Variables` composed from the given variable's name and different declination
     /// indexes. Resulting instances all have a different index than the original variable.
-    pub fn generator_from_var(var: &Variable) -> impl Iterator<Item = Self> {
-        VariableGenerator {
+    pub fn generator_from_var(var: &Variable) -> TypedVariableGenerator {
+        TypedVariableGenerator {
             name: var.name.clone(),
             variant: var.variant + 1,
+            prim: var.prim,
         }
     }
 
-    pub fn from_ident(ident: &str) -> Self {
+    pub fn from_ident(ident: &str, prim: PrimitiveSizedType) -> Self {
         Variable {
             name: Some(ident.to_owned()),
             variant: 0,
+            prim,
         }
     }
 

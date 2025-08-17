@@ -56,7 +56,7 @@ impl Node {
 
 pub struct Graph {
     pub nodes: Vec<Node>,
-    pub(crate) register_generator: Box<dyn Iterator<Item = Variable>>,
+    pub(crate) register_generator: VariableGenerator,
 }
 
 impl std::fmt::Debug for Graph {
@@ -69,7 +69,7 @@ impl Graph {
     fn new() -> Graph {
         Graph {
             nodes: Default::default(),
-            register_generator: Box::new(Variable::generator(None)),
+            register_generator: Variable::generator(None),
         }
     }
 
@@ -87,7 +87,7 @@ impl Graph {
             ast::Statement::Declaration { variables, .. } => {
                 variables.iter().fold(prev, |acc, (r, v)| {
                     if let Some(v) = v {
-                        self.add_declaration(acc, Variable::from_ident(r), v)
+                        self.add_declaration(acc, Variable::from_ident(r, todo!()), v)
                     } else {
                         acc
                     }
@@ -104,7 +104,7 @@ impl Graph {
 
     fn add_expr(&mut self, prev: NodeHandle, expr: &ast::Expr) -> (Variable, NodeHandle) {
         if let ast::Expr::Identifier(reg) = expr {
-            (Variable::from_ident(reg), prev)
+            (Variable::from_ident(reg, todo!()), prev)
         } else {
             let reg = self.alloc_reg();
             let hdx = self.add_declaration(prev, reg.clone(), expr);
@@ -214,7 +214,7 @@ impl Graph {
                 prev,
                 next: 0,
                 op: UnaryOperator::Assign,
-                hs: Value::Var(Variable::from_ident(id)),
+                hs: Value::Var(Variable::from_ident(id, todo!())),
                 dst: r.clone(),
             }),
             ast::Expr::Litteral(ast::Litteral::String(_)) => panic!(),
@@ -368,7 +368,7 @@ impl Graph {
     }
 
     fn alloc_reg(&mut self) -> Variable {
-        self.register_generator.next().unwrap()
+        self.register_generator.next(todo!()).unwrap()
     }
 
     fn populate_forward_edge(&mut self) {
