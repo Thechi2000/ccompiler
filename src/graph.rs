@@ -1,21 +1,28 @@
+//! Traits and functions used to generate visualizations for Directed Cyclic Graphs.
 use crate::common::Variable;
 
 pub type NodeHandle = usize;
 
 pub trait Graph<N: Node> {
+    /// All the entrypoints of the graph, i.e. Nodes marking the start of a function.
     fn entrypoints(&self) -> Vec<NodeHandle>;
 
+    /// All the nodes of the graph.
     fn nodes(&self) -> &[N];
 }
 
 pub trait Node {
+    /// List of all the predecssors of the node.
     fn prev(&self) -> Vec<NodeHandle>;
+    /// List of all the followers of the node.
     fn next(&self) -> Vec<NodeHandle>;
 
-    fn label<F: Fn(&Variable) -> String>(&self, regfmt: F) -> String;
+    /// Formats the content of the node into a readable string, using the given `varfmt` in case it needs to format
+    /// [`Variables`][crate::common::Variable].
+    fn label<F: Fn(&Variable) -> String>(&self, varfmt: F) -> String;
 }
 
-pub mod visualisation {
+mod visualisation {
     mod flowchart {
         use std::{collections::BTreeSet, fmt::Debug};
 
@@ -164,20 +171,26 @@ pub mod visualisation {
         }
     }
 
+    /// Graph formats supported by the visualizer.
     #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
     pub enum GraphType {
+        /// <https://www.mermaidchart.com/>
         Mermaid,
+        /// <https://flowchart.fun/>
         Flowchart,
     }
 
-    pub fn generate_representation<N, G>(graph: G, target: GraphType) -> String
+    /// Generate a formatted string that can be used with the visualizer of the given `r#type`.
+    pub fn generate_representation<N, G>(graph: G, r#type: GraphType) -> String
     where
         N: super::Node,
         G: super::Graph<N>,
     {
-        match target {
+        match r#type {
             GraphType::Mermaid => mermaid::generate_mermaid(graph),
             GraphType::Flowchart => flowchart::generate_flowchart(graph),
         }
     }
 }
+
+pub use visualisation::{GraphType, generate_representation};

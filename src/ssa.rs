@@ -76,26 +76,26 @@ impl graph::Node for Node {
         }
     }
 
-    fn label<F: Fn(&Variable) -> String>(&self, regfmt: F) -> String {
+    fn label<F: Fn(&Variable) -> String>(&self, varfmt: F) -> String {
         match self {
             Node::Start { name, .. } => format!("{name}()"),
             Node::UnOp { op, hs, dst, .. } => format!(
                 "{} <- {}{}",
-                regfmt(dst),
+                varfmt(dst),
                 match op {
                     UnaryOperator::Assign => "",
                     UnaryOperator::Ref => "&",
                     UnaryOperator::Deref => "*",
                     UnaryOperator::BNot => "~",
                 },
-                hs.fmt(&regfmt)
+                hs.fmt(&varfmt)
             ),
             Node::BinOp {
                 op, lhs, rhs, dst, ..
             } => format!(
                 "{} <- {} {} {}",
-                regfmt(dst),
-                lhs.fmt(&regfmt),
+                varfmt(dst),
+                lhs.fmt(&varfmt),
                 match op {
                     BinaryOperator::Mul => "*",
                     BinaryOperator::Div => "/",
@@ -116,17 +116,17 @@ impl graph::Node for Node {
                     BinaryOperator::LAnd => "&&",
                     BinaryOperator::LOr => "||",
                 },
-                rhs.fmt(&regfmt)
+                rhs.fmt(&varfmt)
             ),
-            Node::Fork { cond, .. } => format!("Fork {}", regfmt(cond)),
+            Node::Fork { cond, .. } => format!("Fork {}", varfmt(cond)),
             Node::Join { joins, .. } => joins
                 .values()
                 .map(|(dst, srcs)| {
                     format!(
                         "{} <- Φ({})",
-                        regfmt(dst),
+                        varfmt(dst),
                         srcs.iter()
-                            .map(|r| regfmt(r))
+                            .map(|r| varfmt(r))
                             .collect::<Vec<_>>()
                             .join(", ")
                     )
@@ -136,7 +136,7 @@ impl graph::Node for Node {
             Node::Ret { value, .. } => {
                 format!(
                     "Ret {}",
-                    value.as_ref().map(|s| s.fmt(&regfmt)).unwrap_or_default()
+                    value.as_ref().map(|s| s.fmt(&varfmt)).unwrap_or_default()
                 )
             }
         }

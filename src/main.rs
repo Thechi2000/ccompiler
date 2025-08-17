@@ -3,7 +3,7 @@ use std::{fs::File, io::Read};
 use clap::{Parser, Subcommand};
 use lalrpop_util::lalrpop_mod;
 
-use crate::graph::visualisation::{GraphType, generate_representation};
+use crate::graph::{GraphType, generate_representation};
 
 lalrpop_mod!(grammar);
 mod ast;
