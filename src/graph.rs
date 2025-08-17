@@ -1,5 +1,3 @@
-use crate::rtl::RegLit;
-
 pub type NodeHandle = usize;
 
 pub trait Graph<N: Node> {
@@ -19,10 +17,7 @@ pub mod visualisation {
     mod flowchart {
         use std::collections::BTreeSet;
 
-        use crate::{
-            graph::{self, Graph, Node},
-            rtl::RegLit,
-        };
+        use crate::graph::{self, Graph, Node};
 
         #[derive(Debug)]
         struct FlowNode {
