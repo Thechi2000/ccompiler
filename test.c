@@ -9,6 +9,14 @@ int main() {
   int b = 2;
   int c = 0;
 
+  struct abc {
+    int a;
+  } const d;
+
+  int const* e = 0;
+
+  struct abc f;
+
   while (c < a) {
     c += b;
   }

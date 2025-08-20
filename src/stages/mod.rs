@@ -1,13 +1,24 @@
 //! Structures and enumeration that are used accross multiple compilation stages.
 
-use crate::ast::PrimitiveSizedType;
-
 pub mod rtl;
 pub mod ssa;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PrimitiveTypeClass {
+    SInt,
+    UInt,
+    Float,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PrimitiveSizedType {
+    pub ty: PrimitiveTypeClass,
+    pub size: u8,
+}
+
 /// Represents a simple variable that can be manipulated through assembly instructions.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Variable {
+pub struct Register {
     /// Original identifier of the variable, or `None` in case the variable was algorithmically generated.
     pub name: Option<String>,
     /// Declination index, when there is a name clash, e.g. due to scoping, or when a single variable is deconstructed
@@ -24,8 +35,8 @@ pub struct VariableGenerator {
 }
 
 impl VariableGenerator {
-    pub fn next(&mut self, prim: PrimitiveSizedType) -> Option<Variable> {
-        let next = Some(Variable {
+    pub fn next(&mut self, prim: PrimitiveSizedType) -> Option<Register> {
+        let next = Some(Register {
             name: self.name.clone(),
             variant: self.variant,
             prim,
@@ -44,8 +55,8 @@ pub struct TypedVariableGenerator {
 }
 
 impl TypedVariableGenerator {
-    pub fn next(&mut self) -> Option<Variable> {
-        let next = Some(Variable {
+    pub fn next(&mut self) -> Option<Register> {
+        let next = Some(Register {
             name: self.name.clone(),
             variant: self.variant,
             prim: self.prim,
@@ -57,7 +68,7 @@ impl TypedVariableGenerator {
     }
 }
 
-impl Variable {
+impl Register {
     /// Creates an iterator yielding `Variables` composed from the given `ident` and different declination indexes.
     pub fn generator(ident: Option<String>) -> VariableGenerator {
         VariableGenerator {
@@ -68,7 +79,7 @@ impl Variable {
 
     /// Creates an iterator yielding `Variables` composed from the given variable's name and different declination
     /// indexes. Resulting instances all have a different index than the original variable.
-    pub fn generator_from_var(var: &Variable) -> TypedVariableGenerator {
+    pub fn generator_from_var(var: &Register) -> TypedVariableGenerator {
         TypedVariableGenerator {
             name: var.name.clone(),
             variant: var.variant + 1,
@@ -77,7 +88,7 @@ impl Variable {
     }
 
     pub fn from_ident(ident: &str, prim: PrimitiveSizedType) -> Self {
-        Variable {
+        Register {
             name: Some(ident.to_owned()),
             variant: 0,
             prim,
@@ -113,13 +124,13 @@ pub type Litteral = i32;
 /// Holds any value that may be used in an operation, either a litteral or a variable.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
-    Var(Variable),
+    Var(Register),
     Lit(Litteral),
 }
 
 impl Value {
     /// Formats the value into a readable String, using the provided formatter in case it is a variable.
-    pub fn fmt<F: Fn(&Variable) -> String>(&self, varfmt: &F) -> String {
+    pub fn fmt<F: Fn(&Register) -> String>(&self, varfmt: &F) -> String {
         match self {
             Value::Var(r) => varfmt(r),
             Value::Lit(l) => l.to_string(),

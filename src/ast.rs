@@ -40,14 +40,15 @@ mod typing {
     #[derive(Debug, Clone)]
     pub struct ItemPointer {
         pub ty: Box<Type>,
-        pub quals: Vec<TypeQualifier>,
     }
 
     #[derive(Debug, Clone)]
     pub enum ItemType {
         Primitive(ItemPrimitive),
-        Struct(ItemStruct),
-        Union(ItemUnion),
+        ExplicitStruct(ItemStruct),
+        NamedStruct(Identifier),
+        ExplicitUnion(ItemUnion),
+        NamedUnion(Identifier),
         Pointer(ItemPointer),
         Void,
     }

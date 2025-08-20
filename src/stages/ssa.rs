@@ -26,7 +26,7 @@ pub enum Node {
         next: NodeHandle,
         op: UnaryOperator,
         hs: Value,
-        dst: Variable,
+        dst: Register,
     },
     BinOp {
         prev: NodeHandle,
@@ -34,16 +34,16 @@ pub enum Node {
         op: BinaryOperator,
         lhs: Value,
         rhs: Value,
-        dst: Variable,
+        dst: Register,
     },
     Fork {
         prev: NodeHandle,
         location: NodeHandle,
         next: NodeHandle,
-        cond: Variable,
+        cond: Register,
     },
     Join {
-        joins: BTreeMap<Variable, (Variable, Vec<Variable>)>,
+        joins: BTreeMap<Register, (Register, Vec<Register>)>,
         prev: Vec<NodeHandle>,
         next: NodeHandle,
     },
@@ -75,7 +75,7 @@ impl graph::Node for Node {
         }
     }
 
-    fn label<F: Fn(&Variable) -> String>(&self, varfmt: F) -> String {
+    fn label<F: Fn(&Register) -> String>(&self, varfmt: F) -> String {
         match self {
             Node::Start { name, .. } => format!("{name}()"),
             Node::UnOp { op, hs, dst, .. } => format!(
@@ -158,8 +158,8 @@ impl graph::Graph<Node> for Graph {
 }
 
 pub fn compile(graph: rtl::Graph) -> Graph {
-    fn walk_variable(graph: &mut Graph, hdx: NodeHandle, old_name: &Variable) {
-        let mut generator = Variable::generator_from_var(old_name);
+    fn walk_variable(graph: &mut Graph, hdx: NodeHandle, old_name: &Register) {
+        let mut generator = Register::generator_from_var(old_name);
         let mut visisted = BTreeSet::new();
         let mut to_process = vec![(hdx, generator.next().unwrap())];
 

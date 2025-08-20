@@ -54,7 +54,7 @@ fn main() {
         Target::Parse { .. } => {
             eprintln!(
                 "{:#?}",
-                grammar::TopLevelDeclarationParser::new().parse(&str)
+                grammar::FileParser::new().parse(&str)
             )
         }
         Target::Rtl { output, .. } => {

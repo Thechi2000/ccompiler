@@ -15,7 +15,7 @@ pub enum Node {
         next: NodeHandle,
         op: UnaryOperator,
         hs: Value,
-        dst: Variable,
+        dst: Register,
     },
     BinOp {
         prev: NodeHandle,
@@ -23,13 +23,13 @@ pub enum Node {
         op: BinaryOperator,
         lhs: Value,
         rhs: Value,
-        dst: Variable,
+        dst: Register,
     },
     Fork {
         prev: NodeHandle,
         location: NodeHandle,
         next: NodeHandle,
-        cond: Variable,
+        cond: Register,
     },
     Join {
         prev: Vec<NodeHandle>,
@@ -69,7 +69,7 @@ impl Graph {
     fn new() -> Graph {
         Graph {
             nodes: Default::default(),
-            register_generator: Variable::generator(None),
+            register_generator: Register::generator(None),
         }
     }
 
@@ -87,7 +87,7 @@ impl Graph {
             ast::Statement::Declaration { variables, .. } => {
                 variables.iter().fold(prev, |acc, (r, v)| {
                     if let Some(v) = v {
-                        self.add_declaration(acc, Variable::from_ident(r, todo!()), v)
+                        self.add_declaration(acc, Register::from_ident(r, todo!()), v)
                     } else {
                         acc
                     }
@@ -102,9 +102,9 @@ impl Graph {
         }
     }
 
-    fn add_expr(&mut self, prev: NodeHandle, expr: &ast::Expr) -> (Variable, NodeHandle) {
+    fn add_expr(&mut self, prev: NodeHandle, expr: &ast::Expr) -> (Register, NodeHandle) {
         if let ast::Expr::Identifier(reg) = expr {
-            (Variable::from_ident(reg, todo!()), prev)
+            (Register::from_ident(reg, todo!()), prev)
         } else {
             let reg = self.alloc_reg();
             let hdx = self.add_declaration(prev, reg.clone(), expr);
@@ -112,7 +112,7 @@ impl Graph {
         }
     }
 
-    fn add_declaration(&mut self, prev: NodeHandle, r: Variable, v: &ast::Expr) -> NodeHandle {
+    fn add_declaration(&mut self, prev: NodeHandle, r: Register, v: &ast::Expr) -> NodeHandle {
         match v {
             ast::Expr::BinaryOperation { lhs, rhs, op } => {
                 let (lhs_reg, hdx) = self.add_expr(prev, lhs);
@@ -214,7 +214,7 @@ impl Graph {
                 prev,
                 next: 0,
                 op: UnaryOperator::Assign,
-                hs: Value::Var(Variable::from_ident(id, todo!())),
+                hs: Value::Var(Register::from_ident(id, todo!())),
                 dst: r.clone(),
             }),
             ast::Expr::Litteral(ast::Litteral::String(_)) => panic!(),
@@ -367,7 +367,7 @@ impl Graph {
         })
     }
 
-    fn alloc_reg(&mut self) -> Variable {
+    fn alloc_reg(&mut self) -> Register {
         self.register_generator.next(todo!()).unwrap()
     }
 
@@ -455,7 +455,7 @@ impl graph::Node for Node {
         }
     }
 
-    fn label<F: Fn(&Variable) -> String>(&self, varfmt: F) -> String {
+    fn label<F: Fn(&Register) -> String>(&self, varfmt: F) -> String {
         match self {
             Node::Start { name, .. } => format!("{name}()"),
             Node::UnOp { op, hs, dst, .. } => format!(

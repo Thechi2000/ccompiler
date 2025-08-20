@@ -1,6 +1,6 @@
 //! Traits and functions used to generate visualizations for Directed Cyclic Graphs.
 
-use crate::stages::Variable;
+use crate::stages::Register;
 
 pub type NodeHandle = usize;
 
@@ -20,7 +20,7 @@ pub trait Node {
 
     /// Formats the content of the node into a readable string, using the given `varfmt` in case it needs to format
     /// [`Variables`][crate::common::Variable].
-    fn label<F: Fn(&Variable) -> String>(&self, varfmt: F) -> String;
+    fn label<F: Fn(&Register) -> String>(&self, varfmt: F) -> String;
 }
 
 mod flowchart {
@@ -65,7 +65,7 @@ mod flowchart {
                 id,
                 children,
                 backward_edges,
-                label: graph.nodes()[id].label(Variable::default_fmt),
+                label: graph.nodes()[id].label(Register::default_fmt),
             }
         }
 
@@ -142,7 +142,7 @@ pub mod mermaid {
         for node in &nodes {
             str.push_str(&format!(
                 "  {node}[\"{}\"]\n",
-                graph.nodes()[*node].label(Variable::html_fmt)
+                graph.nodes()[*node].label(Register::html_fmt)
             ));
         }
 

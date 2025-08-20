@@ -96,6 +96,12 @@ match {
     r"[_a-zA-Z]\w*"
 }
 
+// ======================================
+// ||              TYPING              ||
+// ======================================
+
+// ----------  Parsing primitive types ----------
+
 pub PrimitiveType: PrimitiveType = {
     "char" => PrimitiveType::Char,
     "int" => PrimitiveType::Int,
@@ -104,14 +110,12 @@ pub PrimitiveType: PrimitiveType = {
     "double" => PrimitiveType::Double,
 };
 
-
-pub TypeSpecifier: TypeSpecifier = {
-    "long" => TypeSpecifier::Long,
-    "short" => TypeSpecifier::Short,
-    "unsigned" => TypeSpecifier::Unsigned,
-    "signed" => TypeSpecifier::Signed,
+pub PrimitiveTypeSpecifier: PrimitiveTypeSpecifier = {
+    "long" => PrimitiveTypeSpecifier::Long,
+    "short" => PrimitiveTypeSpecifier::Short,
+    "unsigned" => PrimitiveTypeSpecifier::Unsigned,
+    "signed" => PrimitiveTypeSpecifier::Signed,
 };
-
 
 pub TypeQualifier: TypeQualifier = {
     "const" => TypeQualifier::Const,
@@ -119,11 +123,44 @@ pub TypeQualifier: TypeQualifier = {
     "volatile" => TypeQualifier::Volatile,
 };
 
+pub ItemPrimitive: ItemPrimitive = {
+    <specs: PrimitiveTypeSpecifier*> <ty: PrimitiveType> => ItemPrimitive { ty, specs },
+}
+
+// ----------  Parsing struct & unions ----------
+
+pub StructField: (Identifier, Type) = {
+    <ty: Type> <id: Identifier> ";" => (id, ty),
+}
+
+pub ItemStruct: ItemStruct = {
+    "struct" <ident: Identifier?> "{" <fields: StructField*> "}" => ItemStruct { ident, fields },
+}
+
+pub ItemUnion: ItemUnion = {
+    "union" <ident: Identifier?> "{" <fields: StructField*> "}" => ItemUnion { ident, fields },
+}
+
+// ----------  Parsing pointers ----------
+
+pub ItemPointer: ItemPointer = {
+    <ty: Type> "*" => ItemPointer { ty: Box::new(ty) }
+}
+
+// ----------  Parsing whole types ----------
+
+pub ItemType: ItemType = {
+    <p: ItemPrimitive> => ItemType::Primitive(p),
+    <s: ItemStruct> => ItemType::ExplicitStruct(s),
+    "struct" <s: Identifier> => ItemType::NamedStruct(s),
+    <u: ItemUnion> => ItemType::ExplicitUnion(u),
+    "union" <u: Identifier> => ItemType::NamedUnion(u),
+    <p: ItemPointer> => ItemType::Pointer(p),
+    "void" => ItemType::Void,
+}
+
 pub Type: Type = {
-    <q: TypeQualifier*> <s: TypeSpecifier*> <t: PrimitiveType> => Type {
-        primitive: s.into_iter().fold(t, PrimitiveType::with_specifier),
-        qualifiers: q,
-    }
+    <ty: ItemType> <quals: TypeQualifier*> => Type { ty, quals },
 }
 
 ExprReset: Expr = Expr;
